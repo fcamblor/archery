@@ -6,6 +6,7 @@
 - [x] Un personnage (sprite placeholder) avec déplacement gauche/droite, gravité, saut
 - [x] Collision avec les plateformes
 - [x] Wrap-around sur tous les bords (gauche/droite, haut/bas)
+- [x] Wall slide (glissade le long des murs)
 
 ## Itération 2 — Tir et physique des flèches
 - [ ] Visée (8 directions ou libre) et tir de flèches

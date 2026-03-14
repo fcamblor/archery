@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 const SPEED = 160;
 const JUMP_VELOCITY = -300;
 const PLAYER_SIZE = 12;
+const WALL_SLIDE_SPEED = 40;
 
 export class Player {
   public sprite: Phaser.Physics.Arcade.Sprite;
@@ -45,8 +46,21 @@ export class Player {
       body.setVelocityY(JUMP_VELOCITY);
     }
 
+    // Wall slide : glisser lentement quand on est en l'air et qu'on appuie contre un mur
+    this.wallSlide(body);
+
     // Wrap-around sur tous les bords
     this.wrapAround();
+  }
+
+  private wallSlide(body: Phaser.Physics.Arcade.Body) {
+    const isAirborne = !body.blocked.down;
+    const isPushingLeft = this.cursors.left.isDown && body.blocked.left;
+    const isPushingRight = this.cursors.right.isDown && body.blocked.right;
+
+    if (isAirborne && (isPushingLeft || isPushingRight) && body.velocity.y > 0) {
+      body.setVelocityY(Math.min(body.velocity.y, WALL_SLIDE_SPEED));
+    }
   }
 
   private wrapAround() {
