@@ -1,11 +1,11 @@
 # Plan de développement — Towerfall PhaserJS
 
-## Itération 1 — Setup + Personnage mobile sur un niveau
-- [ ] Initialisation du projet (Phaser 3, bundler, structure)
-- [ ] Niveau simple avec plateformes (tilemap)
-- [ ] Un personnage (sprite placeholder) avec déplacement gauche/droite, gravité, saut
-- [ ] Collision avec les plateformes
-- [ ] Wrap-around sur tous les bords (gauche/droite, haut/bas)
+## Itération 1 — Setup + Personnage mobile sur un niveau ✅
+- [x] Initialisation du projet (Phaser 3, bundler, structure)
+- [x] Niveau simple avec plateformes (tilemap)
+- [x] Un personnage (sprite placeholder) avec déplacement gauche/droite, gravité, saut
+- [x] Collision avec les plateformes
+- [x] Wrap-around sur tous les bords (gauche/droite, haut/bas)
 
 ## Itération 2 — Tir et physique des flèches
 - [ ] Visée (8 directions ou libre) et tir de flèches
