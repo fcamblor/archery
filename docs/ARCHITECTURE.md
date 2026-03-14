@@ -12,7 +12,7 @@ src/
 
 ## Physique
 
-- Wall slide : en l'air, appuyer vers un mur plafonne la vitesse de chute (`WALL_SLIDE_SPEED`)
+- Wall cling : en l'air, appuyer vers un mur immobilise le joueur (vélocité Y = 0)
 
 ## Niveaux
 

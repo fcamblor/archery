@@ -15,7 +15,7 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 - Déplacement gauche/droite sur des plateformes 2D
 - Saut (avec gravité)
 - **Wrap-around** : franchir un bord du niveau (haut, bas, gauche, droite) fait réapparaître le joueur du côté opposé
-- **Wall slide** : en l'air, appuyer vers un mur ralentit la chute (glissade le long du mur)
+- **Wall cling** : en l'air, appuyer vers un mur permet de s'y accrocher (le joueur reste immobile)
 
 ## Flèches
 
