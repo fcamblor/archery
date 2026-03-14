@@ -16,6 +16,7 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 - Saut (avec gravité)
 - **Wrap-around** : franchir un bord du niveau (haut, bas, gauche, droite) fait réapparaître le joueur du côté opposé
 - **Wall cling** : en l'air, appuyer vers un mur permet de s'y accrocher (le joueur reste immobile)
+- **Wall jump** : depuis un wall cling, sauter éjecte le joueur à l'opposé du mur avec une hauteur réduite (~2/3 du saut normal). Le joueur peut revenir s'accrocher au mur pour escalader progressivement.
 
 ## Flèches
 

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 
 const SPEED = 160;
 const JUMP_VELOCITY = -300;
+const WALL_JUMP_VELOCITY = -200;
+const WALL_JUMP_PUSH = 200;
 const PLAYER_SIZE = 12;
 
 export class Player {
@@ -9,6 +11,9 @@ export class Player {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private scene: Phaser.Scene;
   private gfx: Phaser.GameObjects.Graphics;
+  private isClinging = false;
+  private clingDirection: 'left' | 'right' | null = null;
+  private wallJumpCooldown = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -31,18 +36,34 @@ export class Player {
   update(_delta: number) {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
-    // Déplacement horizontal
-    if (this.cursors.left.isDown) {
-      body.setVelocityX(-SPEED);
-    } else if (this.cursors.right.isDown) {
-      body.setVelocityX(SPEED);
-    } else {
-      body.setVelocityX(0);
+    // Déplacement horizontal (désactivé pendant l'éjection du wall jump)
+    if (this.wallJumpCooldown <= 0) {
+      if (this.cursors.left.isDown) {
+        body.setVelocityX(-SPEED);
+      } else if (this.cursors.right.isDown) {
+        body.setVelocityX(SPEED);
+      } else {
+        body.setVelocityX(0);
+      }
     }
 
-    // Saut : uniquement si on touche le sol
-    if (this.cursors.up.isDown && body.blocked.down) {
-      body.setVelocityY(JUMP_VELOCITY);
+    // Cooldown après wall jump pour éviter de re-coller au mur immédiatement
+    if (this.wallJumpCooldown > 0) {
+      this.wallJumpCooldown -= _delta;
+    }
+
+    // Saut : depuis le sol ou wall jump depuis le mur
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+      if (body.blocked.down) {
+        body.setVelocityY(JUMP_VELOCITY);
+      } else if (this.isClinging) {
+        body.setAllowGravity(true);
+        body.setVelocityY(WALL_JUMP_VELOCITY);
+        // Éjecter à l'opposé du mur
+        const pushDir = this.clingDirection === 'left' ? 1 : -1;
+        body.setVelocityX(pushDir * WALL_JUMP_PUSH);
+        this.wallJumpCooldown = 150;
+      }
     }
 
     // Wall cling : rester collé au mur quand on est en l'air et qu'on appuie contre un mur
@@ -56,9 +77,10 @@ export class Player {
     const isAirborne = !body.blocked.down;
     const isPushingLeft = this.cursors.left.isDown && body.blocked.left;
     const isPushingRight = this.cursors.right.isDown && body.blocked.right;
-    const isClinging = isAirborne && (isPushingLeft || isPushingRight);
+    this.isClinging = isAirborne && (isPushingLeft || isPushingRight) && this.wallJumpCooldown <= 0;
+    this.clingDirection = this.isClinging ? (isPushingLeft ? 'left' : 'right') : null;
 
-    if (isClinging) {
+    if (this.isClinging) {
       body.setVelocityY(0);
       body.setAllowGravity(false);
     } else {

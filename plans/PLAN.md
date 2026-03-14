@@ -7,6 +7,7 @@
 - [x] Collision avec les plateformes
 - [x] Wrap-around sur tous les bords (gauche/droite, haut/bas)
 - [x] Wall cling (s'accrocher aux murs)
+- [x] Wall jump (saut depuis un mur avec éjection opposée)
 
 ## Itération 2 — Tir et physique des flèches
 - [ ] Visée (8 directions ou libre) et tir de flèches

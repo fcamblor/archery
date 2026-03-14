@@ -13,6 +13,7 @@ src/
 ## Physique
 
 - Wall cling : en l'air, appuyer vers un mur immobilise le joueur (vélocité Y = 0)
+- Wall jump : depuis un wall cling, le joueur est éjecté à l'opposé du mur (impulsion horizontale + verticale réduite). Un cooldown empêche le re-cling immédiat et bloque le contrôle horizontal pendant l'éjection.
 
 ## Niveaux
 
