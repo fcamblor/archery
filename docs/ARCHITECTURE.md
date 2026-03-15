@@ -60,3 +60,27 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 - Animation de stomp spécifique : écrasement horizontal du mob (scaleX 1.8, scaleY 0.2) + particules jaunes autour du point d'impact.
 - La détection se base sur la position du bas du joueur par rapport au centre vertical de la cible.
 - La mécanique est prête pour le multijoueur (stomp entre joueurs).
+
+## Outils de développement
+
+### Profilage avec Chrome DevTools MCP
+
+Pour profiler les performances directement depuis Claude Code, ajouter le serveur MCP suivant (`.claude/settings.json` ou config MCP globale) :
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--autoConnect",
+        "--channel=beta"
+      ]
+    }
+  }
+}
+```
+
+Prérequis : activer le remote debugging sur Chrome (`--remote-debugging-port=9222`).
+Référence : https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session
