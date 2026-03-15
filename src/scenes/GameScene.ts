@@ -105,8 +105,8 @@ export class GameScene extends Phaser.Scene {
       const arrow = this.arrows[i];
       arrow.update();
 
-      if (!arrow.stuck && arrow.armed) {
-        // Collision flèche en vol → mobs
+      if (!arrow.stuck) {
+        // Collision flèche en vol → mobs (pas besoin d'être armée)
         for (let j = this.mobs.length - 1; j >= 0; j--) {
           const mob = this.mobs[j];
           if (mob.alive && this.checkOverlap(arrow.sprite, mob.sprite)) {
@@ -117,8 +117,8 @@ export class GameScene extends Phaser.Scene {
           }
         }
 
-        // Collision flèche en vol → joueur (sa propre flèche peut le tuer)
-        if (!arrow.stuck && this.checkOverlap(arrow.sprite, this.player.sprite)) {
+        // Collision flèche en vol → joueur (armée uniquement, évite le suicide au tir)
+        if (!arrow.stuck && arrow.armed && this.checkOverlap(arrow.sprite, this.player.sprite)) {
           this.killPlayer();
           arrow.stick();
         }

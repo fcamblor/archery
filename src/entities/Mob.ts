@@ -46,14 +46,18 @@ export class Mob {
     body.setVelocityX(MOB_SPEED * this.direction);
 
     // Inverser la direction si bloqué par un mur
+    let wallBounced = false;
     if (body.blocked.left) {
       this.direction = 1;
+      wallBounced = true;
     } else if (body.blocked.right) {
       this.direction = -1;
+      wallBounced = true;
     }
 
     // Détection de bord de plateforme : inverser avant de tomber
-    if (body.blocked.down) {
+    // (sauf si on vient de rebondir sur un mur, pour éviter la double inversion)
+    if (body.blocked.down && !wallBounced) {
       this.checkEdge();
     }
 
