@@ -106,12 +106,11 @@ export class GameScene extends Phaser.Scene {
       arrow.update();
 
       if (!arrow.stuck) {
-        // Collision flèche en vol → mobs (pas besoin d'être armée)
+        // Collision flèche en vol → mobs (la flèche traverse le mob)
         for (let j = this.mobs.length - 1; j >= 0; j--) {
           const mob = this.mobs[j];
           if (mob.alive && this.checkOverlap(arrow.sprite, mob.sprite)) {
             mob.die();
-            arrow.stick();
             this.mobs.splice(j, 1);
             break;
           }

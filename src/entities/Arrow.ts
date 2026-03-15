@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 
-const ARROW_SPEED = 400;
+const ARROW_SPEED = 550;
 const ARROW_WIDTH = 10;
 const ARROW_HEIGHT = 3;
-const ARROW_GRAVITY = 600;
+const ARROW_GRAVITY = 400;
 
 export class Arrow {
   public sprite: Phaser.Physics.Arcade.Sprite;
