@@ -6,7 +6,7 @@
 src/
   main.ts            — Point d'entrée, config Phaser
   scenes/            — Scènes Phaser (GameScene, etc.)
-  entities/          — Entités de jeu (Player, etc.)
+  entities/          — Entités de jeu (Player, Arrow, Mob)
   levels/            — Données de niveaux (grilles number[][])
 ```
 
@@ -30,3 +30,15 @@ Les niveaux sont des grilles 2D (`number[][]`) : `0` = vide, `1` = plateforme so
 Les plateformes aux bords doivent être cohérentes avec le wrap-around.
 
 Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lors du `buildLevel` pour éviter les collisions parasites aux coutures entre tuiles individuelles.
+
+## Mobs
+
+- Entité `Mob` (`src/entities/Mob.ts`) : cibles mobiles qui patrouillent sur les plateformes.
+- Déplacement horizontal à vitesse constante, inversion de direction au contact d'un mur ou au bord d'une plateforme.
+- Tués par une flèche en vol (animation de mort : expansion + fade out).
+- Collision flèche→mob détectée manuellement dans `GameScene.update`.
+
+## Mort du joueur
+
+- Le joueur peut être tué par sa propre flèche (après un délai d'armement de 100ms pour éviter le suicide au tir).
+- Animation de mort identique aux mobs. Respawn automatique après un court délai.

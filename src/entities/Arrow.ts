@@ -8,7 +8,9 @@ const ARROW_GRAVITY = 600;
 export class Arrow {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public stuck = false;
+  public armed = false; // La flèche ne peut pas tuer tant qu'elle n'est pas armée
   private scene: Phaser.Scene;
+  private spawnTime: number;
 
   private static textureCreated = false;
 
@@ -44,10 +46,19 @@ export class Arrow {
 
     // Rotation initiale selon la direction
     this.updateRotation();
+
+    // Délai d'armement pour éviter de tuer le tireur immédiatement
+    this.spawnTime = scene.time.now;
   }
 
   update() {
     if (this.stuck) return;
+
+    // Armer la flèche après 100ms (évite de tuer le tireur au spawn)
+    if (!this.armed && this.scene.time.now - this.spawnTime > 100) {
+      this.armed = true;
+    }
+
     this.updateRotation();
     this.wrapAround();
   }

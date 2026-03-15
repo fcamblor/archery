@@ -17,12 +17,12 @@
 - [x] Compteur de flèches affiché (HUD)
 - [x] Wrap-around des flèches (même logique que le joueur)
 
-## Itération 3 — Mobs cibles + Kill par flèche
-- [ ] Ajout de mobs/mannequins (cibles mobiles basiques sur les plateformes)
-- [ ] Un mob touché par une flèche meurt
-- [ ] Animation de mort simple
-- [ ] Les flèches plantées dans le décor peuvent être ramassées (passer dessus)
-- [ ] Le joueur peut être tué par sa propre flèche
+## Itération 3 — Mobs cibles + Kill par flèche ✅
+- [x] Ajout de mobs/mannequins (cibles mobiles basiques sur les plateformes)
+- [x] Un mob touché par une flèche meurt
+- [x] Animation de mort simple
+- [x] Les flèches plantées dans le décor peuvent être ramassées (passer dessus)
+- [x] Le joueur peut être tué par sa propre flèche
 
 ## Itération 4 — Kill par piétinement (stomp)
 - [ ] Atterrir sur la tête d'un mob le tue
