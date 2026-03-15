@@ -96,11 +96,23 @@ export class GameScene extends Phaser.Scene {
     this.player.update(delta);
 
     // Mise à jour des mobs + collision mob → joueur
-    for (const mob of this.mobs) {
+    const playerBody = this.player.sprite.body as Phaser.Physics.Arcade.Body;
+    for (let i = this.mobs.length - 1; i >= 0; i--) {
+      const mob = this.mobs[i];
       mob.update();
       if (mob.alive && this.checkOverlap(mob.sprite, this.player.sprite)) {
-        this.killPlayer();
-        return;
+        if (this.isStomping(this.player.sprite, mob.sprite)) {
+          // Stomp : le joueur atterrit sur la tête du mob
+          mob.die(true);
+          this.mobs.splice(i, 1);
+          // Rebond du joueur après le stomp
+          playerBody.setVelocityY(-200);
+          this.stompEffect(mob.sprite.x, mob.sprite.y);
+        } else {
+          // Contact normal : le mob tue le joueur
+          this.killPlayer();
+          return;
+        }
       }
     }
 
@@ -172,6 +184,49 @@ export class GameScene extends Phaser.Scene {
     body.setAllowGravity(true);
     body.setVelocity(0, 0);
     this.playerDead = false;
+  }
+
+  /**
+   * Détecte si le sprite A est en train de piétiner le sprite B.
+   * Conditions : A tombe (vélocité Y > 0) et le bas de A est dans la moitié haute de B.
+   */
+  private isStomping(
+    stomper: Phaser.Physics.Arcade.Sprite,
+    target: Phaser.Physics.Arcade.Sprite,
+  ): boolean {
+    const stomperBody = stomper.body as Phaser.Physics.Arcade.Body;
+    if (stomperBody.velocity.y <= 0) return false;
+
+    const stomperBounds = stomper.getBounds();
+    const targetBounds = target.getBounds();
+    const targetMidY = targetBounds.y + targetBounds.height / 2;
+
+    // Le bas du stomper doit être dans la moitié haute de la cible
+    return stomperBounds.bottom >= targetBounds.y && stomperBounds.bottom <= targetMidY;
+  }
+
+  private stompEffect(x: number, y: number) {
+    // Particules d'écrasement : petits éclats autour du point de stomp
+    for (let i = 0; i < 6; i++) {
+      const particle = this.add.rectangle(
+        x + Phaser.Math.Between(-8, 8),
+        y,
+        3,
+        3,
+        0xffff00,
+      );
+      this.tweens.add({
+        targets: particle,
+        alpha: 0,
+        y: y + Phaser.Math.Between(-12, 12),
+        x: particle.x + Phaser.Math.Between(-16, 16),
+        scaleX: 0,
+        scaleY: 0,
+        duration: 300,
+        ease: 'Power2',
+        onComplete: () => particle.destroy(),
+      });
+    }
   }
 
   private checkOverlap(

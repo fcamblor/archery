@@ -97,7 +97,7 @@ export class Mob {
     }
   }
 
-  die() {
+  die(stomped = false) {
     if (!this.alive) return;
     this.alive = false;
 
@@ -106,18 +106,33 @@ export class Mob {
     body.setAllowGravity(false);
     body.setEnable(false);
 
-    // Animation de mort : flash rouge + rétrécissement + disparition
-    this.scene.tweens.add({
-      targets: this.sprite,
-      alpha: 0,
-      scaleX: 1.5,
-      scaleY: 1.5,
-      duration: 300,
-      ease: 'Power2',
-      onComplete: () => {
-        this.sprite.destroy();
-      },
-    });
+    if (stomped) {
+      // Animation de stomp : écrasement vertical + disparition
+      this.scene.tweens.add({
+        targets: this.sprite,
+        alpha: 0,
+        scaleX: 1.8,
+        scaleY: 0.2,
+        duration: 250,
+        ease: 'Power2',
+        onComplete: () => {
+          this.sprite.destroy();
+        },
+      });
+    } else {
+      // Animation de mort par flèche : expansion + disparition
+      this.scene.tweens.add({
+        targets: this.sprite,
+        alpha: 0,
+        scaleX: 1.5,
+        scaleY: 1.5,
+        duration: 300,
+        ease: 'Power2',
+        onComplete: () => {
+          this.sprite.destroy();
+        },
+      });
+    }
   }
 
   destroy() {

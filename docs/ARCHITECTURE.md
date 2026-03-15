@@ -50,3 +50,11 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 - La flèche qui tue le joueur continue sa trajectoire (même comportement que pour les mobs).
 - Animation de mort identique aux mobs. Respawn automatique après un court délai.
 - Le nombre de flèches est conservé au respawn (pas de réinitialisation).
+
+## Stomp (piétinement)
+
+- Un joueur qui tombe (vélocité Y > 0) sur la moitié haute d'un mob le tue par piétinement.
+- Après un stomp, le joueur rebondit vers le haut (impulsion de -200).
+- Animation de stomp spécifique : écrasement horizontal du mob (scaleX 1.8, scaleY 0.2) + particules jaunes autour du point d'impact.
+- La détection se base sur la position du bas du joueur par rapport au centre vertical de la cible.
+- La mécanique est prête pour le multijoueur (stomp entre joueurs).

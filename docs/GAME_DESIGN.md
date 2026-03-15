@@ -49,7 +49,7 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 Un joueur peut être tué par :
 1. **Une flèche** — y compris la sienne
 2. **Un mob** — un contact direct avec un mob tue le joueur
-3. **Un piétinement (stomp)** — un autre joueur lui atterrit sur la tête
+3. **Un piétinement (stomp)** — atterrir sur la tête d'un mob ou d'un autre joueur le tue. Le stomper rebondit vers le haut après l'impact.
 4. **Un élément de décor** — pièges (piques, lave, etc.)
 
 ## Niveaux

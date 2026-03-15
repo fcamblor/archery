@@ -24,10 +24,10 @@
 - [x] Les flèches plantées dans le décor peuvent être ramassées (passer dessus)
 - [x] Le joueur peut être tué par sa propre flèche
 
-## Itération 4 — Kill par piétinement (stomp)
-- [ ] Atterrir sur la tête d'un mob le tue
-- [ ] Feedback visuel du stomp
-- [ ] Le stomp fonctionne aussi sur le joueur (auto-test via rebond)
+## Itération 4 — Kill par piétinement (stomp) ✅
+- [x] Atterrir sur la tête d'un mob le tue
+- [x] Feedback visuel du stomp
+- [x] Le stomp fonctionne aussi sur le joueur (auto-test via rebond)
 
 ## Itération 5 — Menu + Architecture réseau
 - [ ] Écran titre et menu principal : Héberger / Rejoindre
