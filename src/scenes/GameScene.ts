@@ -119,7 +119,6 @@ export class GameScene extends Phaser.Scene {
         // Collision flèche en vol → joueur (armée uniquement, évite le suicide au tir)
         if (!arrow.stuck && arrow.armed && this.checkOverlap(arrow.sprite, this.player.sprite)) {
           this.killPlayer();
-          arrow.stick();
         }
       }
 
@@ -168,7 +167,6 @@ export class GameScene extends Phaser.Scene {
     body.setEnable(true);
     body.setAllowGravity(true);
     body.setVelocity(0, 0);
-    this.player.arrowCount = 4;
     this.playerDead = false;
   }
 

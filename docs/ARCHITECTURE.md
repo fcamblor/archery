@@ -46,4 +46,6 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 ## Mort du joueur
 
 - Le joueur peut être tué par sa propre flèche (après un délai d'armement de 100ms pour éviter le suicide au tir).
+- La flèche qui tue le joueur continue sa trajectoire (même comportement que pour les mobs).
 - Animation de mort identique aux mobs. Respawn automatique après un court délai.
+- Le nombre de flèches est conservé au respawn (pas de réinitialisation).

@@ -25,7 +25,8 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 - Tirer une flèche la retire du stock du joueur
 - Les flèches partent **horizontalement** puis suivent une **trajectoire parabolique** (gravité différée)
 - Les flèches se plantent dans les plateformes au contact
-- Les flèches **traversent** les mobs/joueurs tués (elles ne se plantent que dans le décor)
+- Les flèches **traversent** les mobs et les joueurs tués (elles ne se plantent que dans le décor)
+- Le nombre de flèches est **conservé** après la mort (pas de réinitialisation au respawn)
 - Les flèches plantées peuvent être **ramassées** par n'importe quel joueur en passant dessus
 - Les flèches bénéficient du même wrap-around que les joueurs
 
