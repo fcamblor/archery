@@ -15,6 +15,7 @@ export class Player {
   public arrowCount = INITIAL_ARROWS;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private shootKey: Phaser.Input.Keyboard.Key;
+  private jumpKey: Phaser.Input.Keyboard.Key;
   private scene: Phaser.Scene;
   private gfx: Phaser.GameObjects.Graphics;
   private isClinging = false;
@@ -40,6 +41,7 @@ export class Player {
 
     this.cursors = scene.input.keyboard!.createCursorKeys();
     this.shootKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.jumpKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
   }
 
   setOnShoot(callback: (x: number, y: number, dir: AimDirection) => void) {
@@ -72,7 +74,7 @@ export class Player {
     }
 
     // Saut : depuis le sol ou wall jump depuis le mur
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+    if (Phaser.Input.Keyboard.JustDown(this.jumpKey)) {
       if (body.blocked.down) {
         body.setVelocityY(JUMP_VELOCITY);
       } else if (this.isClinging) {

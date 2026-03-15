@@ -10,10 +10,16 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 - Multijoueur en réseau : chaque joueur joue depuis son propre appareil (ordinateur ou tablette)
 - Un joueur héberge la partie (serveur hôte), les autres le rejoignent
 
+## Contrôles
+
+- **Flèches directionnelles** : déplacement gauche/droite et visée (8 directions)
+- **C** : saut / wall jump
+- **Espace** : tir
+
 ## Déplacements
 
 - Déplacement gauche/droite sur des plateformes 2D
-- Saut (avec gravité)
+- Saut avec la touche C (avec gravité)
 - **Wrap-around** : franchir un bord du niveau (haut, bas, gauche, droite) fait réapparaître le joueur du côté opposé
 - **Wall cling** : en l'air, appuyer vers un mur permet de s'y accrocher (le joueur reste immobile)
 - **Wall jump** : depuis un wall cling, sauter éjecte le joueur à l'opposé du mur avec une hauteur réduite (~2/3 du saut normal). Le joueur peut revenir s'accrocher au mur pour escalader progressivement.
