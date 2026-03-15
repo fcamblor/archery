@@ -46,37 +46,14 @@ export class Mob {
     body.setVelocityX(MOB_SPEED * this.direction);
 
     // Inverser la direction si bloqué par un mur
-    let wallBounced = false;
     if (body.blocked.left) {
       this.direction = 1;
-      wallBounced = true;
     } else if (body.blocked.right) {
       this.direction = -1;
-      wallBounced = true;
-    }
-
-    // Détection de bord de plateforme : inverser avant de tomber
-    // (sauf si on vient de rebondir sur un mur, pour éviter la double inversion)
-    if (body.blocked.down && !wallBounced) {
-      this.checkEdge();
     }
 
     // Wrap-around sur tous les bords
     this.wrapAround();
-  }
-
-  private checkEdge() {
-    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-    // Vérifier s'il y a du sol devant le mob en utilisant un rayon vers le bas
-    const checkX = this.sprite.x + this.direction * (MOB_SIZE / 2 + 2);
-    const checkY = this.sprite.y + MOB_SIZE / 2 + 4;
-
-    // Vérifier si un body solide existe sous le prochain pas
-    const bodies = this.scene.physics.overlapRect(checkX, checkY, 2, 2);
-    if (bodies.length === 0) {
-      this.direction *= -1;
-      body.setVelocityX(MOB_SPEED * this.direction);
-    }
   }
 
   private wrapAround() {

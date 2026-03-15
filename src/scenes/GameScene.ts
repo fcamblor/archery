@@ -12,6 +12,7 @@ export class GameScene extends Phaser.Scene {
   private arrows: Arrow[] = [];
   private mobs: Mob[] = [];
   private arrowHud!: Phaser.GameObjects.Text;
+  private fpsText!: Phaser.GameObjects.Text;
   private playerDead = false;
 
   constructor() {
@@ -28,7 +29,7 @@ export class GameScene extends Phaser.Scene {
 
     // Callback de tir
     this.player.setOnShoot((x, y, dir) => {
-      const arrow = new Arrow(this, x, y, dir.x, dir.y);
+      const arrow = new Arrow(this, x, y, dir.x, dir.y, this.player.sprite);
       this.arrows.push(arrow);
 
       // Collision flèche → plateformes : la flèche se plante
@@ -45,6 +46,15 @@ export class GameScene extends Phaser.Scene {
     });
     this.arrowHud.setScrollFactor(0);
     this.arrowHud.setDepth(100);
+
+    // FPS counter (debug)
+    this.fpsText = this.add.text(8, 22, '', {
+      fontSize: '10px',
+      color: '#888888',
+      fontFamily: 'monospace',
+    });
+    this.fpsText.setScrollFactor(0);
+    this.fpsText.setDepth(100);
   }
 
   private buildLevel() {
@@ -122,18 +132,21 @@ export class GameScene extends Phaser.Scene {
       arrow.update();
 
       if (!arrow.stuck) {
-        // Collision flèche en vol → mobs (la flèche traverse le mob)
+        const tip = arrow.getTipPosition();
+
+        // Collision pointe de flèche → mobs
         for (let j = this.mobs.length - 1; j >= 0; j--) {
           const mob = this.mobs[j];
-          if (mob.alive && this.checkOverlap(arrow.sprite, mob.sprite)) {
+          if (mob.alive && this.tipHitsSprite(tip, mob.sprite)) {
             mob.die();
             this.mobs.splice(j, 1);
             break;
           }
         }
 
-        // Collision flèche en vol → joueur (armée uniquement, évite le suicide au tir)
-        if (!arrow.stuck && arrow.armed && this.checkOverlap(arrow.sprite, this.player.sprite)) {
+        // Collision pointe de flèche → joueur (ignore les flèches tirées par le joueur)
+        if (!arrow.stuck && arrow.armed && arrow.spawner !== this.player.sprite
+            && this.tipHitsSprite(tip, this.player.sprite)) {
           this.killPlayer();
         }
       }
@@ -149,6 +162,7 @@ export class GameScene extends Phaser.Scene {
 
     // Mise à jour du HUD
     this.arrowHud.setText('▲ '.repeat(this.player.arrowCount).trim());
+    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | arrows: ${this.arrows.length} | mobs: ${this.mobs.length}`);
   }
 
   private killPlayer() {
@@ -227,6 +241,15 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => particle.destroy(),
       });
     }
+  }
+
+  /** Vérifie si un point (la pointe de la flèche) est dans les bounds d'un sprite */
+  private tipHitsSprite(
+    tip: { x: number; y: number },
+    target: Phaser.Physics.Arcade.Sprite,
+  ): boolean {
+    const bounds = target.getBounds();
+    return bounds.contains(tip.x, tip.y);
   }
 
   private checkOverlap(

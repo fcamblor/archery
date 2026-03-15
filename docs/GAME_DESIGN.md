@@ -40,14 +40,14 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 ## Mobs
 
 - Des **mannequins/cibles** patrouillent sur les plateformes
-- Ils avancent horizontalement et font demi-tour aux murs et bords de plateforme
-- Un mob touché par une flèche **meurt** (animation d'expansion + disparition)
+- Ils avancent horizontalement, font demi-tour aux murs, et tombent des plateformes
+- Un mob touché par la **pointe** d'une flèche **meurt** (animation d'expansion + disparition)
 - Les mobs bénéficient du wrap-around
 
 ## Conditions de mort
 
 Un joueur peut être tué par :
-1. **Une flèche** — y compris la sienne
+1. **Une flèche d'un autre joueur** — seule la pointe de la flèche est létale. Une flèche en vol ne peut pas tuer son propre tireur.
 2. **Un mob** — un contact direct avec un mob tue le joueur
 3. **Un piétinement (stomp)** — atterrir sur la tête d'un mob ou d'un autre joueur le tue. Le stomper rebondit vers le haut après l'impact.
 4. **Un élément de décor** — pièges (piques, lave, etc.)

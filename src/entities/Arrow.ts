@@ -15,10 +15,11 @@ export class Arrow {
   private gravityEnabled = false;
   private lastVx = 0;
   private lastVy = 0;
+  public spawner?: Phaser.Physics.Arcade.Sprite;
 
   private static textureCreated = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, dirX: number, dirY: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, dirX: number, dirY: number, spawner?: Phaser.Physics.Arcade.Sprite) {
     this.scene = scene;
 
     if (!Arrow.textureCreated) {
@@ -52,6 +53,10 @@ export class Arrow {
     // Pas de gravité au départ pour un tir bien horizontal
     body.setAllowGravity(false);
 
+    // Limiter la vitesse max pour éviter le tunneling à travers les plateformes
+    body.setMaxSpeed(ARROW_SPEED);
+
+    this.spawner = spawner;
     this.updateRotation();
     this.spawnTime = scene.time.now;
   }
@@ -123,6 +128,27 @@ export class Arrow {
     } else if (this.sprite.y > height + halfH) {
       this.sprite.y = -halfH;
     }
+  }
+
+  /** Position de la pointe de la flèche (extrémité avant dans la direction de vol) */
+  getTipPosition(): { x: number; y: number } {
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    const vx = body.velocity.x;
+    const vy = body.velocity.y;
+    const len = Math.sqrt(vx * vx + vy * vy);
+    if (len === 0) {
+      // Flèche plantée : utiliser la dernière direction connue
+      const lLen = Math.sqrt(this.lastVx * this.lastVx + this.lastVy * this.lastVy);
+      if (lLen === 0) return { x: this.sprite.x, y: this.sprite.y };
+      return {
+        x: this.sprite.x + (this.lastVx / lLen) * (ARROW_WIDTH / 2),
+        y: this.sprite.y + (this.lastVy / lLen) * (ARROW_WIDTH / 2),
+      };
+    }
+    return {
+      x: this.sprite.x + (vx / len) * (ARROW_WIDTH / 2),
+      y: this.sprite.y + (vy / len) * (ARROW_WIDTH / 2),
+    };
   }
 
   destroy() {
