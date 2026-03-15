@@ -1,16 +1,20 @@
 import Phaser from 'phaser';
 
-const ARROW_SPEED = 550;
+const ARROW_SPEED = 500;
 const ARROW_WIDTH = 10;
 const ARROW_HEIGHT = 3;
-const ARROW_GRAVITY = 400;
+const ARROW_GRAVITY = 700;
+const EMBED_DEPTH = 4; // pixels d'enfoncement dans la plateforme
 
 export class Arrow {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public stuck = false;
-  public armed = false; // La flèche ne peut pas tuer tant qu'elle n'est pas armée
+  public armed = false;
   private scene: Phaser.Scene;
   private spawnTime: number;
+  private gravityEnabled = false;
+  private lastVx = 0;
+  private lastVy = 0;
 
   private static textureCreated = false;
 
@@ -30,33 +34,46 @@ export class Arrow {
     }
 
     this.sprite = scene.physics.add.sprite(x, y, 'arrow');
-    this.sprite.setSize(ARROW_WIDTH, ARROW_HEIGHT);
+    // Body carré petit pour que la collision soit précise quelle que soit la rotation
+    this.sprite.setSize(4, 4);
     this.sprite.setBounce(0);
     this.sprite.setCollideWorldBounds(false);
 
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-    // Normaliser la direction et appliquer la vitesse
     const len = Math.sqrt(dirX * dirX + dirY * dirY);
     if (len > 0) {
-      body.setVelocity((dirX / len) * ARROW_SPEED, (dirY / len) * ARROW_SPEED);
+      const vx = (dirX / len) * ARROW_SPEED;
+      const vy = (dirY / len) * ARROW_SPEED;
+      body.setVelocity(vx, vy);
+      this.lastVx = vx;
+      this.lastVy = vy;
     }
 
-    body.setAllowGravity(true);
-    body.setGravityY(ARROW_GRAVITY - 800); // Compenser la gravité globale (800) pour obtenir ARROW_GRAVITY
+    // Pas de gravité au départ pour un tir bien horizontal
+    body.setAllowGravity(false);
 
-    // Rotation initiale selon la direction
     this.updateRotation();
-
-    // Délai d'armement pour éviter de tuer le tireur immédiatement
     this.spawnTime = scene.time.now;
   }
 
   update() {
     if (this.stuck) return;
 
-    // Armer la flèche après 100ms (évite de tuer le tireur au spawn)
-    if (!this.armed && this.scene.time.now - this.spawnTime > 100) {
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+
+    // Sauvegarder la vélocité avant que le collider ne la modifie
+    this.lastVx = body.velocity.x;
+    this.lastVy = body.velocity.y;
+
+    const elapsed = this.scene.time.now - this.spawnTime;
+    if (!this.armed && elapsed > 100) {
       this.armed = true;
+    }
+
+    if (!this.gravityEnabled && elapsed > 120) {
+      this.gravityEnabled = true;
+      body.setAllowGravity(true);
+      body.setGravityY(ARROW_GRAVITY - 800);
     }
 
     this.updateRotation();
@@ -66,8 +83,6 @@ export class Arrow {
   private updateRotation() {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     this.sprite.rotation = Math.atan2(body.velocity.y, body.velocity.x);
-    // Retourner le sprite si la flèche va vers la gauche
-    this.sprite.setFlipY(Math.abs(body.velocity.x) > 0 && body.velocity.x < 0 ? false : false);
   }
 
   stick() {
@@ -77,7 +92,18 @@ export class Arrow {
     body.setVelocity(0, 0);
     body.setAllowGravity(false);
     body.setImmovable(true);
-    // Garder la rotation figée au moment de l'impact
+
+    // Enfoncer la flèche dans la plateforme selon sa direction de vol
+    const absVx = Math.abs(this.lastVx);
+    const absVy = Math.abs(this.lastVy);
+
+    if (absVx > absVy) {
+      // Impact horizontal : décaler en X
+      this.sprite.x += Math.sign(this.lastVx) * EMBED_DEPTH;
+    } else {
+      // Impact vertical : décaler en Y
+      this.sprite.y += Math.sign(this.lastVy) * EMBED_DEPTH;
+    }
   }
 
   private wrapAround() {
