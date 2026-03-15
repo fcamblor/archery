@@ -42,10 +42,11 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 - Wrap-around sur les 4 bords (même logique que joueur et flèches).
 - Tués par une flèche en vol (animation de mort : expansion + fade out).
 - Collision flèche→mob détectée manuellement dans `GameScene.update`.
+- Contact mob→joueur : tue le joueur (détecté via `checkOverlap` dans `GameScene.update`).
 
 ## Mort du joueur
 
-- Le joueur peut être tué par sa propre flèche (après un délai d'armement de 100ms pour éviter le suicide au tir).
+- Le joueur peut être tué par sa propre flèche (après un délai d'armement de 100ms pour éviter le suicide au tir), ou par contact direct avec un mob.
 - La flèche qui tue le joueur continue sa trajectoire (même comportement que pour les mobs).
 - Animation de mort identique aux mobs. Respawn automatique après un court délai.
 - Le nombre de flèches est conservé au respawn (pas de réinitialisation).

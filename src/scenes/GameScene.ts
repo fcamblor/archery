@@ -95,9 +95,13 @@ export class GameScene extends Phaser.Scene {
 
     this.player.update(delta);
 
-    // Mise à jour des mobs
+    // Mise à jour des mobs + collision mob → joueur
     for (const mob of this.mobs) {
       mob.update();
+      if (mob.alive && this.checkOverlap(mob.sprite, this.player.sprite)) {
+        this.killPlayer();
+        return;
+      }
     }
 
     // Mise à jour des flèches + collisions
