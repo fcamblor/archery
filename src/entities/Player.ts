@@ -13,7 +13,10 @@ export type AimDirection = { x: number; y: number };
 export class Player {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public arrowCount = INITIAL_ARROWS;
-  private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+  private leftKey: Phaser.Input.Keyboard.Key;
+  private rightKey: Phaser.Input.Keyboard.Key;
+  private upKey: Phaser.Input.Keyboard.Key;
+  private downKey: Phaser.Input.Keyboard.Key;
   private shootKey: Phaser.Input.Keyboard.Key;
   private jumpKey: Phaser.Input.Keyboard.Key;
   private scene: Phaser.Scene;
@@ -39,9 +42,12 @@ export class Player {
     this.sprite.setBounce(0);
     this.sprite.setCollideWorldBounds(false);
 
-    this.cursors = scene.input.keyboard!.createCursorKeys();
-    this.shootKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.jumpKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    this.leftKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.rightKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.upKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.downKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+    this.shootKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+    this.jumpKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K);
   }
 
   setOnShoot(callback: (x: number, y: number, dir: AimDirection) => void) {
@@ -59,9 +65,9 @@ export class Player {
 
     // Déplacement horizontal (désactivé pendant l'éjection du wall jump)
     if (this.wallJumpCooldown <= 0) {
-      if (this.cursors.left.isDown) {
+      if (this.leftKey.isDown) {
         body.setVelocityX(-SPEED);
-      } else if (this.cursors.right.isDown) {
+      } else if (this.rightKey.isDown) {
         body.setVelocityX(SPEED);
       } else {
         body.setVelocityX(0);
@@ -91,8 +97,8 @@ export class Player {
     this.wallCling(body);
 
     // Mise à jour de la direction du joueur
-    if (this.cursors.left.isDown) this.facing = 'left';
-    else if (this.cursors.right.isDown) this.facing = 'right';
+    if (this.leftKey.isDown) this.facing = 'left';
+    else if (this.rightKey.isDown) this.facing = 'right';
 
     // Tir de flèche
     if (Phaser.Input.Keyboard.JustDown(this.shootKey) && this.arrowCount > 0) {
@@ -109,11 +115,11 @@ export class Player {
     let dx = 0;
     let dy = 0;
 
-    if (this.cursors.left.isDown) dx = -1;
-    else if (this.cursors.right.isDown) dx = 1;
+    if (this.leftKey.isDown) dx = -1;
+    else if (this.rightKey.isDown) dx = 1;
 
-    if (this.cursors.up.isDown) dy = -1;
-    else if (this.cursors.down.isDown) dy = 1;
+    if (this.upKey.isDown) dy = -1;
+    else if (this.downKey.isDown) dy = 1;
 
     // Si aucune direction n'est pressée, tirer dans la direction du regard
     if (dx === 0 && dy === 0) {
@@ -125,8 +131,8 @@ export class Player {
 
   private wallCling(body: Phaser.Physics.Arcade.Body) {
     const isAirborne = !body.blocked.down;
-    const isPushingLeft = this.cursors.left.isDown && body.blocked.left;
-    const isPushingRight = this.cursors.right.isDown && body.blocked.right;
+    const isPushingLeft = this.leftKey.isDown && body.blocked.left;
+    const isPushingRight = this.rightKey.isDown && body.blocked.right;
     this.isClinging = isAirborne && (isPushingLeft || isPushingRight) && this.wallJumpCooldown <= 0;
     this.clingDirection = this.isClinging ? (isPushingLeft ? 'left' : 'right') : null;
 

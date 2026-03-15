@@ -19,7 +19,7 @@ src/
 
 - Entité `Arrow` (`src/entities/Arrow.ts`) : sprite avec physique arcade, rotation alignée sur la vélocité.
 - Body physique carré (4x4) indépendant du sprite visuel (10x3) pour une collision précise quelle que soit la rotation.
-- Visée 8 directions via les touches fléchées au moment du tir (Espace). Sans direction, tir dans la direction du regard. Le saut est assigné à la touche C (séparé de la visée vers le haut).
+- Visée 8 directions via W/S (haut/bas) combiné avec A/D (gauche/droite) au moment du tir (O). Sans direction, tir dans la direction du regard. Le saut est assigné à la touche K (séparé de la visée vers le haut).
 - Trajectoire : départ horizontal (gravité désactivée pendant 120ms), puis courbe parabolique.
 - Les flèches se plantent dans les plateformes (`collider` → vélocité 0, gravité désactivée, puis décalage de 4px dans la direction de vol pour enfoncement visuel).
 - Les flèches traversent les mobs sans se planter (le mob meurt, la flèche continue).
