@@ -5,15 +5,23 @@ const JUMP_VELOCITY = -300;
 const WALL_JUMP_VELOCITY = -200;
 const WALL_JUMP_PUSH = 200;
 const PLAYER_SIZE = 12;
+const INITIAL_ARROWS = 4;
+const MAX_ARROWS = 8;
+
+export type AimDirection = { x: number; y: number };
 
 export class Player {
   public sprite: Phaser.Physics.Arcade.Sprite;
+  public arrowCount = INITIAL_ARROWS;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+  private shootKey: Phaser.Input.Keyboard.Key;
   private scene: Phaser.Scene;
   private gfx: Phaser.GameObjects.Graphics;
   private isClinging = false;
   private clingDirection: 'left' | 'right' | null = null;
   private wallJumpCooldown = 0;
+  private facing: 'left' | 'right' = 'right';
+  private onShoot?: (x: number, y: number, dir: AimDirection) => void;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -31,6 +39,17 @@ export class Player {
     this.sprite.setCollideWorldBounds(false);
 
     this.cursors = scene.input.keyboard!.createCursorKeys();
+    this.shootKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+  }
+
+  setOnShoot(callback: (x: number, y: number, dir: AimDirection) => void) {
+    this.onShoot = callback;
+  }
+
+  addArrow(): boolean {
+    if (this.arrowCount >= MAX_ARROWS) return false;
+    this.arrowCount++;
+    return true;
   }
 
   update(_delta: number) {
@@ -69,8 +88,37 @@ export class Player {
     // Wall cling : rester collé au mur quand on est en l'air et qu'on appuie contre un mur
     this.wallCling(body);
 
+    // Mise à jour de la direction du joueur
+    if (this.cursors.left.isDown) this.facing = 'left';
+    else if (this.cursors.right.isDown) this.facing = 'right';
+
+    // Tir de flèche
+    if (Phaser.Input.Keyboard.JustDown(this.shootKey) && this.arrowCount > 0) {
+      const aim = this.getAimDirection();
+      this.arrowCount--;
+      this.onShoot?.(this.sprite.x, this.sprite.y, aim);
+    }
+
     // Wrap-around sur tous les bords
     this.wrapAround();
+  }
+
+  private getAimDirection(): AimDirection {
+    let dx = 0;
+    let dy = 0;
+
+    if (this.cursors.left.isDown) dx = -1;
+    else if (this.cursors.right.isDown) dx = 1;
+
+    if (this.cursors.up.isDown) dy = -1;
+    else if (this.cursors.down.isDown) dy = 1;
+
+    // Si aucune direction n'est pressée, tirer dans la direction du regard
+    if (dx === 0 && dy === 0) {
+      dx = this.facing === 'left' ? -1 : 1;
+    }
+
+    return { x: dx, y: dy };
   }
 
   private wallCling(body: Phaser.Physics.Arcade.Body) {

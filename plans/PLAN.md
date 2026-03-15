@@ -9,13 +9,13 @@
 - [x] Wall cling (s'accrocher aux murs)
 - [x] Wall jump (saut depuis un mur avec éjection opposée)
 
-## Itération 2 — Tir et physique des flèches
-- [ ] Visée (8 directions ou libre) et tir de flèches
-- [ ] Trajectoire parabolique (gravité sur les flèches)
-- [ ] Les flèches se plantent dans les plateformes au contact
-- [ ] Stock de départ : 4 flèches, maximum : 8
-- [ ] Compteur de flèches affiché (HUD)
-- [ ] Wrap-around des flèches (même logique que le joueur)
+## Itération 2 — Tir et physique des flèches ✅
+- [x] Visée (8 directions ou libre) et tir de flèches
+- [x] Trajectoire parabolique (gravité sur les flèches)
+- [x] Les flèches se plantent dans les plateformes au contact
+- [x] Stock de départ : 4 flèches, maximum : 8
+- [x] Compteur de flèches affiché (HUD)
+- [x] Wrap-around des flèches (même logique que le joueur)
 
 ## Itération 3 — Mobs cibles + Kill par flèche
 - [ ] Ajout de mobs/mannequins (cibles mobiles basiques sur les plateformes)
