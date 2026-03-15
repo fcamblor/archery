@@ -56,6 +56,9 @@ export class Mob {
     if (body.blocked.down) {
       this.checkEdge();
     }
+
+    // Wrap-around sur tous les bords
+    this.wrapAround();
   }
 
   private checkEdge() {
@@ -69,6 +72,24 @@ export class Mob {
     if (bodies.length === 0) {
       this.direction *= -1;
       body.setVelocityX(MOB_SPEED * this.direction);
+    }
+  }
+
+  private wrapAround() {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const half = MOB_SIZE / 2;
+
+    if (this.sprite.x < -half) {
+      this.sprite.x = width + half;
+    } else if (this.sprite.x > width + half) {
+      this.sprite.x = -half;
+    }
+
+    if (this.sprite.y < -half) {
+      this.sprite.y = height + half;
+    } else if (this.sprite.y > height + half) {
+      this.sprite.y = -half;
     }
   }
 

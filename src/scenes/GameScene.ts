@@ -122,13 +122,13 @@ export class GameScene extends Phaser.Scene {
           this.killPlayer();
           arrow.stick();
         }
-      } else {
-        // Ramasser les flèches plantées
-        if (this.checkOverlap(this.player.sprite, arrow.sprite)) {
-          if (this.player.addArrow()) {
-            arrow.destroy();
-            this.arrows.splice(i, 1);
-          }
+      }
+
+      // Ramasser les flèches plantées (uniquement stuck)
+      if (arrow.stuck && this.checkOverlap(this.player.sprite, arrow.sprite)) {
+        if (this.player.addArrow()) {
+          arrow.destroy();
+          this.arrows.splice(i, 1);
         }
       }
     }
