@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { VirtualInputState } from '../ui/TouchControls';
 
 const SPEED = 160;
 const JUMP_VELOCITY = -300;
@@ -30,6 +31,9 @@ export class Player {
   private keys: Record<string, boolean> = {};
   private justPressed: Set<string> = new Set();
   private scene: Phaser.Scene;
+  private virtualInput: VirtualInputState | null = null;
+  private virtualJumpConsumed = false;
+  private virtualShootConsumed = false;
   private isClinging = false;
   private clingDirection: 'left' | 'right' | null = null;
   private wallJumpCooldown = 0;
@@ -89,6 +93,11 @@ export class Player {
     this.onShoot = callback;
   }
 
+  /** Connecter les contrôles tactiles (joystick + boutons) */
+  setVirtualInput(state: VirtualInputState) {
+    this.virtualInput = state;
+  }
+
   addArrow(): boolean {
     if (this.arrowCount >= MAX_ARROWS) return false;
     this.arrowCount++;
@@ -104,10 +113,11 @@ export class Player {
 
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
-    const left = this.isKeyDown('KeyA');
-    const right = this.isKeyDown('KeyD');
-    const jump = this.isJustPressed('KeyK');
-    const shoot = this.isJustPressed('KeyO');
+    const vi = this.virtualInput;
+    const left = this.isKeyDown('KeyA') || !!vi?.left;
+    const right = this.isKeyDown('KeyD') || !!vi?.right;
+    const jump = this.isJustPressed('KeyK') || this.isVirtualJustPressed('jump');
+    const shoot = this.isJustPressed('KeyO') || this.isVirtualJustPressed('shoot');
 
     // Déplacement horizontal (désactivé pendant l'éjection du wall jump)
     if (this.wallJumpCooldown <= 0) {
@@ -225,15 +235,38 @@ export class Player {
     return this.justPressed.has(code);
   }
 
+  /** Détecte un front montant pour les boutons virtuels (saut/tir) */
+  private isVirtualJustPressed(button: 'jump' | 'shoot'): boolean {
+    if (!this.virtualInput) return false;
+    if (button === 'jump') {
+      const pressed = this.virtualInput.jump;
+      if (pressed && !this.virtualJumpConsumed) {
+        this.virtualJumpConsumed = true;
+        return true;
+      }
+      if (!pressed) this.virtualJumpConsumed = false;
+      return false;
+    }
+    // shoot
+    const pressed = this.virtualInput.shoot;
+    if (pressed && !this.virtualShootConsumed) {
+      this.virtualShootConsumed = true;
+      return true;
+    }
+    if (!pressed) this.virtualShootConsumed = false;
+    return false;
+  }
+
   private getAimDirection(): AimDirection {
     let dx = 0;
     let dy = 0;
 
-    if (this.isKeyDown('KeyA')) dx = -1;
-    else if (this.isKeyDown('KeyD')) dx = 1;
+    const vi = this.virtualInput;
+    if (this.isKeyDown('KeyA') || vi?.left) dx = -1;
+    else if (this.isKeyDown('KeyD') || vi?.right) dx = 1;
 
-    if (this.isKeyDown('KeyW')) dy = -1;
-    else if (this.isKeyDown('KeyS')) dy = 1;
+    if (this.isKeyDown('KeyW') || vi?.up) dy = -1;
+    else if (this.isKeyDown('KeyS') || vi?.down) dy = 1;
 
     // Si aucune direction n'est pressée, tirer dans la direction du regard
     if (dx === 0 && dy === 0) {
@@ -244,9 +277,10 @@ export class Player {
   }
 
   private wallCling(body: Phaser.Physics.Arcade.Body) {
+    const vi = this.virtualInput;
     const isAirborne = !body.blocked.down;
-    const isPushingLeft = this.isKeyDown('KeyA') && body.blocked.left;
-    const isPushingRight = this.isKeyDown('KeyD') && body.blocked.right;
+    const isPushingLeft = (this.isKeyDown('KeyA') || !!vi?.left) && body.blocked.left;
+    const isPushingRight = (this.isKeyDown('KeyD') || !!vi?.right) && body.blocked.right;
     this.isClinging = isAirborne && (isPushingLeft || isPushingRight) && this.wallJumpCooldown <= 0;
     this.clingDirection = this.isClinging ? (isPushingLeft ? 'left' : 'right') : null;
 

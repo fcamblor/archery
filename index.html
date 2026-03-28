@@ -2,14 +2,40 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="screen-orientation" content="landscape" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <title>Towerfall PhaserJS</title>
   <style>
     * { margin: 0; padding: 0; }
-    body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+    body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; }
+    /* Écran de rotation pour les mobiles en portrait */
+    #rotate-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #1a1a2e;
+      color: #e9c46a;
+      font-family: monospace;
+      font-size: 18px;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+    }
+    #rotate-screen .rotate-icon { font-size: 48px; }
+    @media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+      #rotate-screen { display: flex; }
+    }
   </style>
 </head>
 <body>
+  <div id="rotate-screen">
+    <span class="rotate-icon">📱↻</span>
+    <span>Tournez votre appareil en mode paysage</span>
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

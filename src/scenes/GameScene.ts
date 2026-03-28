@@ -3,6 +3,7 @@ import { Player } from '../entities/Player';
 import { Arrow } from '../entities/Arrow';
 import { LEVEL_1 } from '../levels/level1';
 import { NetworkManager } from '../network/NetworkManager';
+import { TouchControls, isTouchDevice } from '../ui/TouchControls';
 import type { PlayerState, ArrowData, ScoreBoard } from '../shared/types';
 
 const TILE_SIZE = 16;
@@ -22,6 +23,7 @@ export class GameScene extends Phaser.Scene {
   private lastArrowCount = -1;
   private roundEnded = false;
   private scores: ScoreBoard = {};
+  private touchControls: TouchControls | null = null;
 
   // Données reçues du lobby
   private spawnPoints: { id: string; x: number; y: number }[] = [];
@@ -46,6 +48,7 @@ export class GameScene extends Phaser.Scene {
     this.setupLocalPlayerShooting();
     this.setupNetworkListeners();
     this.setupHUD();
+    this.setupTouchControls();
   }
 
   private buildLevel() {
@@ -243,6 +246,22 @@ export class GameScene extends Phaser.Scene {
         this.players.delete(playerId);
       }
     });
+  }
+
+  private setupTouchControls() {
+    if (!isTouchDevice()) return;
+
+    // Ajouter et lancer la scène de contrôles tactiles par-dessus la scène de jeu
+    if (!this.scene.get('TouchControlsScene')) {
+      this.scene.add('TouchControlsScene', TouchControls, false);
+    }
+    this.scene.launch('TouchControlsScene');
+    this.touchControls = this.scene.get('TouchControlsScene') as TouchControls;
+
+    // Connecter l'état virtuel au joueur local
+    if (this.localPlayer && this.touchControls) {
+      this.localPlayer.setVirtualInput(this.touchControls.state);
+    }
   }
 
   private setupHUD() {
@@ -558,6 +577,11 @@ export class GameScene extends Phaser.Scene {
     }
     this.arrows = [];
     this.clearRoundUI();
+    // Arrêter la scène des contrôles tactiles
+    if (this.touchControls) {
+      this.scene.stop('TouchControlsScene');
+      this.touchControls = null;
+    }
   }
 
   shutdown() {
