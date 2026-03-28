@@ -3,7 +3,7 @@ import { Player } from '../entities/Player';
 import { Arrow } from '../entities/Arrow';
 import { LEVEL_1 } from '../levels/level1';
 import { NetworkManager } from '../network/NetworkManager';
-import type { PlayerState, ArrowData } from '../shared/types';
+import type { PlayerState, ArrowData, ScoreBoard } from '../shared/types';
 
 const TILE_SIZE = 16;
 const SYNC_INTERVAL = 50; // ms entre chaque envoi d'état (20 Hz)
@@ -16,10 +16,12 @@ export class GameScene extends Phaser.Scene {
   private arrowHud!: Phaser.GameObjects.Text;
   private fpsText!: Phaser.GameObjects.Text;
   private roundOverText?: Phaser.GameObjects.Text;
+  private scoreTexts: Phaser.GameObjects.Text[] = [];
   private network!: NetworkManager;
   private lastSyncTime = 0;
   private lastArrowCount = -1;
   private roundEnded = false;
+  private scores: ScoreBoard = {};
 
   // Données reçues du lobby
   private spawnPoints: { id: string; x: number; y: number }[] = [];
@@ -99,8 +101,9 @@ export class GameScene extends Phaser.Scene {
   private setupLocalPlayerShooting() {
     if (!this.localPlayer) return;
 
+    const localColor = this.localPlayer.color;
     this.localPlayer.setOnShoot((x, y, dir) => {
-      const arrow = new Arrow(this, x, y, dir.x, dir.y, this.localPlayer.sprite, undefined, this.network.playerId);
+      const arrow = new Arrow(this, x, y, dir.x, dir.y, this.localPlayer.sprite, undefined, this.network.playerId, localColor);
       this.arrows.push(arrow);
 
       // Collision flèche → plateformes
@@ -114,6 +117,7 @@ export class GameScene extends Phaser.Scene {
       this.network.sendArrowFired({
         arrowId: arrow.arrowId,
         ownerId: this.network.playerId,
+        ownerColor: localColor,
         x, y,
         dirX: dir.x,
         dirY: dir.y,
@@ -133,7 +137,7 @@ export class GameScene extends Phaser.Scene {
     // Flèche tirée par un joueur distant
     this.network.onArrowSpawned((data: ArrowData) => {
       const owner = this.players.get(data.ownerId);
-      const arrow = new Arrow(this, data.x, data.y, data.dirX, data.dirY, owner?.sprite, data.arrowId, data.ownerId);
+      const arrow = new Arrow(this, data.x, data.y, data.dirX, data.dirY, owner?.sprite, data.arrowId, data.ownerId, data.ownerColor);
       this.arrows.push(arrow);
 
       this.physics.add.collider(arrow.sprite, this.platforms, () => {
@@ -170,19 +174,20 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // Fin de round
-    this.network.onRoundOver((winnerId, winnerName) => {
+    // Fin de round (un joueur a gagné ce round, mais la partie continue)
+    this.network.onRoundOver((winnerId, winnerName, scores) => {
       this.roundEnded = true;
+      this.scores = scores;
       const isMe = winnerId === this.network.playerId;
       const msg = winnerId === ''
         ? 'ÉGALITÉ !'
-        : isMe ? 'VICTOIRE !' : `${winnerName} gagne !`;
+        : isMe ? 'ROUND GAGNÉ !' : `${winnerName} gagne le round !`;
 
       this.roundOverText = this.add.text(
-        this.scale.width / 2, this.scale.height / 2,
+        this.scale.width / 2, this.scale.height / 2 - 30,
         msg,
         {
-          fontSize: '24px',
+          fontSize: '20px',
           color: isMe ? '#e9c46a' : '#ffffff',
           fontFamily: 'monospace',
           fontStyle: 'bold',
@@ -191,8 +196,40 @@ export class GameScene extends Phaser.Scene {
         },
       ).setOrigin(0.5).setDepth(200);
 
+      this.showScoreBoard(scores);
+    });
+
+    // Nouveau round
+    this.network.onNewRound((spawnPoints, scores) => {
+      this.scores = scores;
+      this.clearRoundUI();
+      this.startNewRound(spawnPoints);
+    });
+
+    // Fin de partie (un joueur a atteint 5 points)
+    this.network.onGameOver((winnerId, winnerName, scores) => {
+      this.roundEnded = true;
+      this.scores = scores;
+      const isMe = winnerId === this.network.playerId;
+      const msg = isMe ? 'VICTOIRE FINALE !' : `${winnerName} remporte la partie !`;
+
+      this.roundOverText = this.add.text(
+        this.scale.width / 2, this.scale.height / 2 - 30,
+        msg,
+        {
+          fontSize: '20px',
+          color: isMe ? '#e9c46a' : '#ffffff',
+          fontFamily: 'monospace',
+          fontStyle: 'bold',
+          backgroundColor: '#000000aa',
+          padding: { x: 20, y: 10 },
+        },
+      ).setOrigin(0.5).setDepth(200);
+
+      this.showScoreBoard(scores);
+
       // Retour au lobby après quelques secondes
-      this.time.delayedCall(3000, () => {
+      this.time.delayedCall(5000, () => {
         this.cleanupGame();
         this.scene.start('LobbyScene', { mode: this.network.isHost ? 'host' : 'join', returning: true });
       });
@@ -277,11 +314,15 @@ export class GameScene extends Phaser.Scene {
         // et les flèches des autres sur le joueur local
         for (const [playerId, player] of this.players) {
           if (!player.alive) continue;
-          // Une flèche ne peut pas tuer son propre tireur
-          if (arrow.ownerId === playerId) continue;
+          // Une flèche ne peut tuer son tireur qu'après avoir quitté sa hitbox
+          if (arrow.ownerId === playerId && !arrow.canHitOwner) continue;
 
           if (arrow.armed && this.tipHitsSprite(tip, player.sprite)) {
-            if (playerId === localId) {
+            if (playerId === localId && arrow.ownerId === localId) {
+              // Le joueur local se tue avec sa propre flèche retombante
+              this.network.sendPlayerHit(localId, 'arrow');
+              player.die();
+            } else if (playerId === localId) {
               // Le joueur local est touché par une flèche distante
               // C'est le tireur (distant) qui devrait détecter, mais pour la réactivité
               // on laisse le serveur gérer via l'événement du tireur
@@ -377,7 +418,8 @@ export class GameScene extends Phaser.Scene {
       this.arrowHud.setText('▲ '.repeat(this.localPlayer.arrowCount).trim());
       this.lastArrowCount = this.localPlayer.arrowCount;
     }
-    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | flèches: ${this.arrows.length} | joueurs: ${this.countAlivePlayers()}/${this.players.size}`);
+    const myScore = this.scores[this.network.playerId] || 0;
+    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | flèches: ${this.arrows.length} | joueurs: ${this.countAlivePlayers()}/${this.players.size} | score: ${myScore}/5`);
   }
 
   private countAlivePlayers(): number {
@@ -442,6 +484,69 @@ export class GameScene extends Phaser.Scene {
     return Phaser.Geom.Intersects.RectangleToRectangle(boundsA, boundsB);
   }
 
+  private showScoreBoard(scores: ScoreBoard) {
+    this.clearScoreTexts();
+    const room = this.network.room;
+    if (!room) return;
+
+    const startY = this.scale.height / 2 + 10;
+    const sorted = room.players
+      .map(p => ({ ...p, score: scores[p.id] || 0 }))
+      .sort((a, b) => b.score - a.score);
+
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      const color = `#${p.color.toString(16).padStart(6, '0')}`;
+      const text = this.add.text(
+        this.scale.width / 2, startY + i * 18,
+        `${p.name}: ${p.score} pt${p.score > 1 ? 's' : ''}`,
+        {
+          fontSize: '12px',
+          color,
+          fontFamily: 'monospace',
+          backgroundColor: '#000000aa',
+          padding: { x: 8, y: 2 },
+        },
+      ).setOrigin(0.5).setDepth(200);
+      this.scoreTexts.push(text);
+    }
+  }
+
+  private clearScoreTexts() {
+    for (const t of this.scoreTexts) {
+      t.destroy();
+    }
+    this.scoreTexts = [];
+  }
+
+  private clearRoundUI() {
+    this.roundOverText?.destroy();
+    this.roundOverText = undefined;
+    this.clearScoreTexts();
+  }
+
+  private startNewRound(spawnPoints: { id: string; x: number; y: number }[]) {
+    // Détruire toutes les flèches
+    for (const arrow of this.arrows) {
+      arrow.destroy();
+    }
+    this.arrows = [];
+
+    // Respawn tous les joueurs
+    for (const sp of spawnPoints) {
+      const player = this.players.get(sp.id);
+      if (player) {
+        player.respawn(sp.x, sp.y);
+      }
+    }
+
+    // Réinitialiser le tir local (les colliders sont perdus lors du respawn)
+    this.setupLocalPlayerShooting();
+
+    this.roundEnded = false;
+    this.lastArrowCount = -1;
+  }
+
   private cleanupGame() {
     this.network.removeAllGameListeners();
     for (const player of this.players.values()) {
@@ -452,7 +557,7 @@ export class GameScene extends Phaser.Scene {
       arrow.destroy();
     }
     this.arrows = [];
-    this.roundOverText?.destroy();
+    this.clearRoundUI();
   }
 
   shutdown() {

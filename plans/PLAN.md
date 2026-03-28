@@ -48,6 +48,9 @@
 - [x] Noms de joueurs affichés au-dessus des sprites
 - [x] Synchronisation des flèches (tir, plantage, ramassage)
 - [x] Retour au lobby après fin de round
+- [x] BUG FIX: flèche retombante tue maintenant son tireur (auto-kill → perte d'1 point, min 0)
+- [x] Système de score : rounds successifs, 1 point par round gagné, partie terminée à 5 points
+- [x] Flèches plantées teintées avec la couleur du joueur propriétaire
 
 ## Itération 7 — Niveaux multiples
 - [ ] 3-4 niveaux avec designs de plateformes variés

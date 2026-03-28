@@ -36,14 +36,14 @@ Les contrôles sont basés sur la position physique des touches (`event.code`), 
 - Les flèches partent **horizontalement** puis suivent une **trajectoire parabolique** (gravité différée)
 - Les flèches se plantent dans les plateformes au contact
 - Les flèches **traversent** les mobs et les joueurs tués (elles ne se plantent que dans le décor)
-- Le nombre de flèches est **conservé** après la mort (pas de réinitialisation au respawn)
+- Le nombre de flèches est **réinitialisé à 4** à chaque nouveau round (respawn)
 - Les flèches plantées peuvent être **ramassées** par n'importe quel joueur en passant dessus
 - Les flèches bénéficient du même wrap-around que les joueurs
 
 ## Conditions de mort
 
 Un joueur peut être tué par :
-1. **Une flèche d'un autre joueur** — seule la pointe de la flèche est létale. Une flèche en vol ne peut pas tuer son propre tireur.
+1. **Une flèche** — seule la pointe de la flèche est létale. Une flèche peut tuer son propre tireur si elle retombe sur lui (auto-kill). Pendant les premières millisecondes, la flèche ne peut pas toucher le tireur (elle doit d'abord quitter sa hitbox).
 2. **Un piétinement (stomp)** — atterrir sur la tête d'un autre joueur le tue. Le stomper rebondit vers le haut après l'impact.
 3. **Un élément de décor** — pièges (piques, lave, etc.) *(itération future)*
 
@@ -56,7 +56,14 @@ Un joueur peut être tué par :
 
 ## Condition de victoire
 
-- Dernier joueur survivant remporte le round
-- Message de victoire affiché pendant 3 secondes
-- Retour automatique au lobby après le round
+- Dernier joueur survivant remporte le round et gagne **1 point**
+- En cas d'égalité (tous morts simultanément), aucun point n'est attribué
+- **Auto-kill** (tué par sa propre flèche) : le joueur perd **1 point** (minimum 0)
+- La partie se termine quand un joueur atteint **5 points**
+- Entre chaque round, le tableau des scores est affiché pendant 3 secondes, puis un nouveau round démarre automatiquement (respawn de tous les joueurs)
+- À la fin de la partie (5 points), retour automatique au lobby après 5 secondes
 - Un joueur déconnecté en cours de partie est considéré comme éliminé
+
+## Flèches — indicateur visuel
+
+- Les flèches plantées dans le décor sont **teintées avec la couleur du joueur** qui les a tirées, permettant de savoir à qui elles appartiennent

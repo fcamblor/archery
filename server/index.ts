@@ -1,6 +1,6 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import type { PlayerInfo, RoomInfo, ClientEvents, ServerEvents, PlayerState } from '../src/shared/types';
+import type { PlayerInfo, RoomInfo, ClientEvents, ServerEvents, PlayerState, ScoreBoard } from '../src/shared/types';
 
 const PORT = 3001;
 
@@ -29,12 +29,16 @@ const SPAWN_POINTS = [
   { x: 240, y: 250 },
 ];
 
+const SCORE_TO_WIN = 5;
+
 // Stockage des rooms
 const rooms = new Map<string, RoomInfo>();
 // Mapping socketId → roomCode
 const playerRooms = new Map<string, string>();
 // Joueurs vivants par room (pour détection de victoire)
 const alivePlayersInRoom = new Map<string, Set<string>>();
+// Scores par room
+const scoresInRoom = new Map<string, ScoreBoard>();
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -47,6 +51,23 @@ function generateRoomCode(): string {
   return code;
 }
 
+function startNewRound(code: string) {
+  const room = rooms.get(code);
+  if (!room) return;
+
+  const alive = new Set(room.players.map(p => p.id));
+  alivePlayersInRoom.set(code, alive);
+
+  const spawnPoints = room.players.map((p, i) => ({
+    id: p.id,
+    x: SPAWN_POINTS[i % SPAWN_POINTS.length].x,
+    y: SPAWN_POINTS[i % SPAWN_POINTS.length].y,
+  }));
+
+  const scores = scoresInRoom.get(code) || {};
+  io.to(code).emit('new-round', spawnPoints, scores);
+}
+
 function checkRoundOver(code: string) {
   const alive = alivePlayersInRoom.get(code);
   const room = rooms.get(code);
@@ -55,13 +76,35 @@ function checkRoundOver(code: string) {
   // Il faut au moins 2 joueurs dans la room pour un round
   if (room.players.length < 2) return;
 
+  let winnerId = '';
+  let winnerName = '';
+
   if (alive.size === 1) {
-    const winnerId = [...alive][0];
+    winnerId = [...alive][0];
     const winner = room.players.find(p => p.id === winnerId);
-    io.to(code).emit('round-over', winnerId, winner?.name || 'Inconnu');
+    winnerName = winner?.name || 'Inconnu';
+
+    // Incrémenter le score du gagnant
+    const scores = scoresInRoom.get(code) || {};
+    scores[winnerId] = (scores[winnerId] || 0) + 1;
+    scoresInRoom.set(code, scores);
+
+    // Vérifier si le joueur a atteint le score de victoire
+    if (scores[winnerId] >= SCORE_TO_WIN) {
+      io.to(code).emit('game-over', winnerId, winnerName, scores);
+      return;
+    }
+
+    io.to(code).emit('round-over', winnerId, winnerName, scores);
+
+    // Lancer un nouveau round après un délai
+    setTimeout(() => startNewRound(code), 3000);
   } else if (alive.size === 0) {
-    // Tout le monde est mort simultanément — pas de gagnant
-    io.to(code).emit('round-over', '', 'Personne');
+    // Tout le monde est mort simultanément — pas de gagnant, pas de point
+    const scores = scoresInRoom.get(code) || {};
+    io.to(code).emit('round-over', '', 'Personne', scores);
+
+    setTimeout(() => startNewRound(code), 3000);
   }
 }
 
@@ -128,9 +171,15 @@ io.on('connection', (socket) => {
       y: SPAWN_POINTS[i % SPAWN_POINTS.length].y,
     }));
 
-    // Initialiser le tracking des joueurs vivants
+    // Initialiser le tracking des joueurs vivants et les scores
     const alive = new Set(room.players.map(p => p.id));
     alivePlayersInRoom.set(code, alive);
+
+    const scores: ScoreBoard = {};
+    for (const p of room.players) {
+      scores[p.id] = 0;
+    }
+    scoresInRoom.set(code, scores);
 
     console.log(`Partie lancée dans la room ${code} avec ${room.players.length} joueurs`);
     io.to(code).emit('game-starting', spawnPoints);
@@ -173,6 +222,14 @@ io.on('connection', (socket) => {
       alive.delete(victimId);
     }
 
+    // Auto-kill : le tireur perd un point (min 0)
+    if (victimId === socket.id) {
+      const scores = scoresInRoom.get(code);
+      if (scores && scores[victimId] > 0) {
+        scores[victimId]--;
+      }
+    }
+
     io.to(code).emit('player-died', victimId, socket.id, method);
     checkRoundOver(code);
   });
@@ -199,6 +256,7 @@ io.on('connection', (socket) => {
     if (room.players.length === 0) {
       rooms.delete(code);
       alivePlayersInRoom.delete(code);
+      scoresInRoom.delete(code);
       console.log(`Room ${code} supprimée (vide)`);
     } else {
       // Si l'hôte quitte, transférer au premier joueur restant

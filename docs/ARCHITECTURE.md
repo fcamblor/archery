@@ -24,7 +24,7 @@ server/
 
 - **Serveur** : Node.js + Socket.io sur le port 3001 (`npm run dev:server`).
 - **Client** : Socket.io-client via `NetworkManager` (singleton).
-- **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene → LobbyScene (retour après round).
+- **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene (rounds successifs) → LobbyScene (retour après game-over à 5 pts).
 - **Rooms** : code à 4 caractères, max 6 joueurs. L'hôte crée la room et lance la partie. Si l'hôte quitte, le rôle est transféré au premier joueur restant.
 - **Nom du joueur** : saisie via input HTML (max 12 caractères) dans le lobby, avant la création/join de room. Le nom est transmis au serveur via les événements `create-room` / `join-room`. Le nom est persisté dans `localStorage` pour pré-remplir le champ lors des sessions suivantes.
 - Les types partagés (`src/shared/types.ts`) définissent les événements client↔serveur de manière typée.
@@ -62,7 +62,7 @@ Le serveur attribue un point de spawn fixe à chaque joueur au lancement (6 posi
 - Visée 8 directions via W/S (haut/bas) combiné avec A/D (gauche/droite) au moment du tir (O). Sans direction, tir dans la direction du regard. Le saut est assigné à la touche K (séparé de la visée vers le haut). Les contrôles utilisent `event.code` (position physique des touches) pour être indépendants du layout clavier (AZERTY/QWERTY).
 - Trajectoire : départ horizontal (gravité désactivée pendant 120ms), puis courbe parabolique. Vitesse plafonnée à `ARROW_SPEED` (500 px/s) via `setMaxSpeed` pour éviter le tunneling à travers les plateformes.
 - **Collision par la pointe** : seule la pointe de la flèche (extrémité avant dans la direction de vol, calculée par `getTipPosition()`) peut tuer. La détection utilise un test point-dans-rectangle (`tipHitsSprite`) au lieu d'un overlap de body complet.
-- **Protection du tireur** : une flèche en vol ne peut pas tuer son propre tireur (vérifié via `ownerId`).
+- **Auto-kill** : une flèche peut tuer son propre tireur, mais seulement après avoir quitté sa hitbox (flag `canHitOwner` activé via `hasLeftOwner`). L'auto-kill entraîne une perte d'1 point (min 0, géré côté serveur).
 - Les flèches se plantent dans les plateformes (`collider` → vélocité 0, gravité désactivée, puis décalage de 4px dans la direction de vol pour enfoncement visuel). Méthode `stickAt()` pour la synchronisation réseau.
 - Les flèches traversent les joueurs tués (la flèche continue).
 - Les flèches plantées sont ramassables par n'importe quel joueur (overlap détecté dans `GameScene.update`).
@@ -105,11 +105,19 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 - Animation de stomp spécifique : écrasement horizontal du joueur (scaleX 1.8, scaleY 0.2) + particules jaunes autour du point d'impact.
 - La détection se base sur la position du bas du joueur par rapport au centre vertical de la cible.
 
-## Condition de victoire
+## Système de score et rounds
 
-- Dernier joueur survivant gagne le round.
-- Le serveur track les joueurs vivants et émet `round-over` quand il ne reste qu'un seul survivant (ou zéro en cas d'égalité).
-- Après 3 secondes d'affichage du résultat, retour automatique au lobby.
+- **Scores** : le serveur maintient un `ScoreBoard` (`{ [playerId]: number }`) par room, initialisé à 0 au début de la partie.
+- **Round gagné** : le gagnant reçoit 1 point. En cas d'égalité, pas de point.
+- **Auto-kill** : perte de 1 point (min 0), détecté quand `victimId === socket.id` dans l'événement `player-hit`.
+- **Fin de round** : le serveur émet `round-over` (avec scores) puis, après 3 secondes, `new-round` avec les nouveaux spawn points.
+- **Fin de partie** : quand un joueur atteint 5 points (`SCORE_TO_WIN`), le serveur émet `game-over` au lieu de `new-round`. Retour au lobby après 5 secondes.
+- **Nouveau round** : tous les joueurs sont respawnés, les flèches sont détruites, le stock de flèches est réinitialisé à 4.
+
+## Flèches — couleur du propriétaire
+
+- Chaque flèche porte un `ownerColor` (couleur du joueur tireur), transmis via `ArrowData`.
+- Quand une flèche se plante (`stick()` ou `stickAt()`), un `setTint(ownerColor)` est appliqué au sprite pour indiquer visuellement le propriétaire.
 
 ## Outils de développement
 

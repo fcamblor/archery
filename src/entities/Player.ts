@@ -34,7 +34,7 @@ export class Player {
   private clingDirection: 'left' | 'right' | null = null;
   private wallJumpCooldown = 0;
   private onShoot?: (x: number, y: number, dir: AimDirection) => void;
-  private color: number;
+  public color: number;
   private nameText: Phaser.GameObjects.Text;
 
   // Compteur de textures pour éviter les collisions de noms
@@ -204,6 +204,7 @@ export class Player {
 
   respawn(x: number, y: number) {
     this.alive = true;
+    this.arrowCount = INITIAL_ARROWS;
     this.sprite.setPosition(x, y);
     this.sprite.setAlpha(1);
     this.sprite.setScale(1);

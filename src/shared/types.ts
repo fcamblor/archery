@@ -28,10 +28,16 @@ export interface PlayerState {
 export interface ArrowData {
   arrowId: string;
   ownerId: string;
+  ownerColor: number;
   x: number;
   y: number;
   dirX: number;
   dirY: number;
+}
+
+// Scores des joueurs
+export interface ScoreBoard {
+  [playerId: string]: number;
 }
 
 // Événements client → serveur
@@ -63,6 +69,8 @@ export interface ServerEvents {
   'arrow-picked-up': (arrowId: string, playerId: string) => void;
   'player-died': (victimId: string, killerId: string, method: 'arrow' | 'stomp') => void;
   'player-respawned': (playerId: string, x: number, y: number) => void;
-  'round-over': (winnerId: string, winnerName: string) => void;
+  'round-over': (winnerId: string, winnerName: string, scores: ScoreBoard) => void;
+  'new-round': (spawnPoints: { id: string; x: number; y: number }[], scores: ScoreBoard) => void;
+  'game-over': (winnerId: string, winnerName: string, scores: ScoreBoard) => void;
   'player-disconnected': (playerId: string) => void;
 }

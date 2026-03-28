@@ -10,22 +10,26 @@ export class Arrow {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public stuck = false;
   public armed = false;
+  public canHitOwner = false;
   public arrowId: string;
   public ownerId: string;
   private scene: Phaser.Scene;
   private spawnTime: number;
   private gravityEnabled = false;
+  private hasLeftOwner = false;
   private lastVx = 0;
   private lastVy = 0;
   public spawner?: Phaser.Physics.Arcade.Sprite;
+  public ownerColor: number;
 
   private static textureCreated = false;
   private static idCounter = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, dirX: number, dirY: number, spawner?: Phaser.Physics.Arcade.Sprite, arrowId?: string, ownerId?: string) {
+  constructor(scene: Phaser.Scene, x: number, y: number, dirX: number, dirY: number, spawner?: Phaser.Physics.Arcade.Sprite, arrowId?: string, ownerId?: string, ownerColor?: number) {
     this.scene = scene;
     this.arrowId = arrowId ?? `arrow_${Date.now()}_${Arrow.idCounter++}`;
     this.ownerId = ownerId ?? '';
+    this.ownerColor = ownerColor ?? 0xf4a261;
 
     if (!Arrow.textureCreated) {
       const gfx = scene.add.graphics();
@@ -86,6 +90,18 @@ export class Arrow {
       body.setGravityY(ARROW_GRAVITY - 800);
     }
 
+    // Permettre l'auto-kill une fois que la flèche a quitté la hitbox du tireur
+    if (!this.canHitOwner && this.spawner) {
+      if (this.hasLeftOwner) {
+        this.canHitOwner = true;
+      } else {
+        const spBounds = this.spawner.getBounds();
+        if (!spBounds.contains(this.sprite.x, this.sprite.y)) {
+          this.hasLeftOwner = true;
+        }
+      }
+    }
+
     this.updateRotation();
     this.wrapAround();
   }
@@ -114,6 +130,9 @@ export class Arrow {
       // Impact vertical : décaler en Y
       this.sprite.y += Math.sign(this.lastVy) * EMBED_DEPTH;
     }
+
+    // Teinter la flèche avec la couleur du propriétaire
+    this.sprite.setTint(this.ownerColor);
   }
 
   /** Forcer la flèche à se planter à une position donnée (sync réseau) */
@@ -126,6 +145,9 @@ export class Arrow {
     body.setVelocity(0, 0);
     body.setAllowGravity(false);
     body.setImmovable(true);
+
+    // Teinter la flèche avec la couleur du propriétaire
+    this.sprite.setTint(this.ownerColor);
   }
 
   private wrapAround() {

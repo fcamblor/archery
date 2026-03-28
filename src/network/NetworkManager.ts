@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { ClientEvents, ServerEvents, RoomInfo, PlayerInfo, PlayerState, ArrowData } from '../shared/types';
+import type { ClientEvents, ServerEvents, RoomInfo, PlayerInfo, PlayerState, ArrowData, ScoreBoard } from '../shared/types';
 
 // Le serveur Socket.io tourne sur le même hôte que la page, port 3001
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
@@ -139,8 +139,16 @@ export class NetworkManager {
     this.socket.on('player-respawned', cb);
   }
 
-  onRoundOver(cb: (winnerId: string, winnerName: string) => void) {
+  onRoundOver(cb: (winnerId: string, winnerName: string, scores: ScoreBoard) => void) {
     this.socket.on('round-over', cb);
+  }
+
+  onNewRound(cb: (spawnPoints: { id: string; x: number; y: number }[], scores: ScoreBoard) => void) {
+    this.socket.on('new-round', cb);
+  }
+
+  onGameOver(cb: (winnerId: string, winnerName: string, scores: ScoreBoard) => void) {
+    this.socket.on('game-over', cb);
   }
 
   onPlayerDisconnected(cb: (playerId: string) => void) {
@@ -160,6 +168,8 @@ export class NetworkManager {
     this.socket.off('player-died');
     this.socket.off('player-respawned');
     this.socket.off('round-over');
+    this.socket.off('new-round');
+    this.socket.off('game-over');
     this.socket.off('player-disconnected');
   }
 
