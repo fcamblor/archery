@@ -1,7 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import type { ClientEvents, ServerEvents, RoomInfo, PlayerInfo } from '../shared/types';
 
-const SERVER_URL = 'http://localhost:3001';
+// Le serveur Socket.io tourne sur le même hôte que la page, port 3001
+const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
 
 type TypedSocket = Socket<ServerEvents, ClientEvents>;
 

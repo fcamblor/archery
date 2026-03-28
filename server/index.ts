@@ -119,6 +119,6 @@ io.on('connection', (socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Serveur Towerfall démarré sur le port ${PORT}`);
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`Serveur Towerfall démarré sur 0.0.0.0:${PORT}`);
 });
