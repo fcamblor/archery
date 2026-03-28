@@ -19,6 +19,7 @@ export class Arrow {
   private hasLeftOwner = false;
   private lastVx = 0;
   private lastVy = 0;
+  private dropping = false;
   public spawner?: Phaser.Physics.Arcade.Sprite;
   public ownerColor: number;
 
@@ -132,6 +133,21 @@ export class Arrow {
     }
 
     // Teinter la flèche avec la couleur du propriétaire
+    this.sprite.setTint(this.ownerColor);
+  }
+
+  /** La flèche transperce le joueur et se plante au sol juste après */
+  drop() {
+    if (this.stuck) return;
+    this.dropping = true;
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    // Garder la vélocité horizontale réduite + forte composante vers le bas
+    const vx = this.lastVx * 0.3;
+    const vy = Math.max(this.lastVy, 0) + 400;
+    body.setVelocity(vx, vy);
+    body.setAllowGravity(true);
+    body.setGravityY(ARROW_GRAVITY - 800);
+    this.gravityEnabled = true;
     this.sprite.setTint(this.ownerColor);
   }
 

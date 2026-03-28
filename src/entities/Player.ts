@@ -200,14 +200,16 @@ export class Player {
 
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
+    body.setVelocity(0, 0);
+    this.sprite.setAlpha(0.5);
+    this.sprite.setTint(0x666666);
+
     if (stomped) {
-      // Mort par piétinement : écraser et faire disparaître
-      body.setVelocity(0, 0);
+      // Mort par piétinement : cadavre écrasé au sol
       body.setAllowGravity(false);
       body.setEnable(false);
       this.scene.tweens.add({
         targets: this.sprite,
-        alpha: 0,
         scaleX: 1.8,
         scaleY: 0.2,
         duration: 250,
@@ -215,12 +217,8 @@ export class Player {
       });
     } else {
       // Mort par flèche : cadavre qui tombe au sol
-      body.setVelocity(0, 0);
       body.setAllowGravity(true);
       body.setEnable(true);
-      // Réduire la hitbox pour ne pas interférer avec les joueurs vivants
-      this.sprite.setAlpha(0.5);
-      this.sprite.setTint(0x666666);
     }
   }
 
