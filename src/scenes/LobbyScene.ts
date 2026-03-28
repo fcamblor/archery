@@ -16,13 +16,15 @@ export class LobbyScene extends Phaser.Scene {
   private joinButton?: Phaser.GameObjects.Text;
   private inputElement?: HTMLInputElement;
   private nameInputElement?: HTMLInputElement;
+  private returning = false;
 
   constructor() {
     super('LobbyScene');
   }
 
-  init(data: { mode: 'host' | 'join' }) {
+  init(data: { mode: 'host' | 'join'; returning?: boolean }) {
     this.mode = data.mode;
+    this.returning = data.returning ?? false;
   }
 
   create() {
@@ -58,8 +60,12 @@ export class LobbyScene extends Phaser.Scene {
       this.scene.start('TitleScene');
     });
 
-    // Lancer la connexion
-    this.connectAndSetup();
+    if (this.returning && this.network.room) {
+      // Retour depuis une partie : on est déjà connecté
+      this.onRoomReady();
+    } else {
+      this.connectAndSetup();
+    }
   }
 
   private async connectAndSetup() {
@@ -76,6 +82,18 @@ export class LobbyScene extends Phaser.Scene {
       this.statusText.setText('Erreur de connexion au serveur');
       this.statusText.setColor('#ff4444');
     }
+  }
+
+  /** Appelé quand on revient d'une partie ou après avoir créé/rejoint une room */
+  private onRoomReady() {
+    const room = this.network.room!;
+    this.codeText.setText(`Code: ${room.code}`);
+    this.statusText.setText('En attente de joueurs...');
+    this.renderPlayerList(room.players);
+    if (this.network.isHost) {
+      this.showStartButton();
+    }
+    this.listenForUpdates();
   }
 
   private createHtmlInput(opts: {
@@ -154,12 +172,8 @@ export class LobbyScene extends Phaser.Scene {
     try {
       const playerName = this.getPlayerName();
       this.removeInput();
-      const room = await this.network.createRoom(playerName);
-      this.codeText.setText(`Code: ${room.code}`);
-      this.statusText.setText('En attente de joueurs...');
-      this.renderPlayerList(room.players);
-      this.showStartButton();
-      this.listenForUpdates();
+      await this.network.createRoom(playerName);
+      this.onRoomReady();
     } catch (err) {
       this.statusText.setText(`Erreur: ${(err as Error).message}`);
     }
@@ -214,11 +228,8 @@ export class LobbyScene extends Phaser.Scene {
       this.statusText.setText('Connexion à la partie...');
       const playerName = this.getPlayerName();
       this.removeInput();
-      const room = await this.network.joinRoom(code, playerName);
-      this.codeText.setText(`Code: ${room.code}`);
-      this.statusText.setText('Dans le lobby');
-      this.renderPlayerList(room.players);
-      this.listenForUpdates();
+      await this.network.joinRoom(code, playerName);
+      this.onRoomReady();
     } catch (err) {
       this.statusText.setText(`Erreur: ${(err as Error).message}`);
       this.statusText.setColor('#ff4444');
@@ -242,9 +253,9 @@ export class LobbyScene extends Phaser.Scene {
       }
     });
 
-    this.network.onGameStarting(() => {
+    this.network.onGameStarting((spawnPoints) => {
       this.cleanup();
-      this.scene.start('GameScene', { networked: true });
+      this.scene.start('GameScene', { networked: true, spawnPoints });
     });
   }
 
@@ -258,11 +269,12 @@ export class LobbyScene extends Phaser.Scene {
     const { width } = this.scale;
     const startY = 110;
 
-    this.add.text(width / 2, startY - 15, `Joueurs (${players.length}/6)`, {
+    const header = this.add.text(width / 2, startY - 15, `Joueurs (${players.length}/6)`, {
       fontSize: '10px',
       color: '#888888',
       fontFamily: 'monospace',
     }).setOrigin(0.5);
+    this.playerListTexts.push(header);
 
     for (let i = 0; i < players.length; i++) {
       const p = players[i];

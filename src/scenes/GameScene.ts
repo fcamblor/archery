@@ -1,89 +1,49 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Arrow } from '../entities/Arrow';
-import { Mob } from '../entities/Mob';
 import { LEVEL_1 } from '../levels/level1';
+import { NetworkManager } from '../network/NetworkManager';
+import type { PlayerState, ArrowData } from '../shared/types';
 
 const TILE_SIZE = 16;
+const SYNC_INTERVAL = 50; // ms entre chaque envoi d'état (20 Hz)
 
 export class GameScene extends Phaser.Scene {
-  private player!: Player;
+  private localPlayer!: Player;
+  private players: Map<string, Player> = new Map();
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private arrows: Arrow[] = [];
-  private mobs: Mob[] = [];
   private arrowHud!: Phaser.GameObjects.Text;
   private fpsText!: Phaser.GameObjects.Text;
-  private debugText!: Phaser.GameObjects.Text;
-  private playerDead = false;
-
-  // Perf instrumentation
-  private perfTimings = {
-    playerUpdate: 0,
-    mobsUpdate: 0,
-    arrowsUpdate: 0,
-    hudUpdate: 0,
-    totalUpdate: 0,
-    getBoundsCount: 0,
-    colliderCount: 0,
-    gameObjectCount: 0,
-  };
-  private perfAccum: typeof GameScene.prototype.perfTimings = {
-    playerUpdate: 0, mobsUpdate: 0, arrowsUpdate: 0, hudUpdate: 0,
-    totalUpdate: 0, getBoundsCount: 0, colliderCount: 0, gameObjectCount: 0,
-  };
-  private perfFrameCount = 0;
-  private lastPerfDisplay = 0;
+  private roundOverText?: Phaser.GameObjects.Text;
+  private network!: NetworkManager;
+  private lastSyncTime = 0;
   private lastArrowCount = -1;
+  private roundEnded = false;
+
+  // Données reçues du lobby
+  private spawnPoints: { id: string; x: number; y: number }[] = [];
 
   constructor() {
     super('GameScene');
   }
 
+  init(data: { networked?: boolean; spawnPoints?: { id: string; x: number; y: number }[] }) {
+    this.spawnPoints = data.spawnPoints ?? [];
+  }
+
   create() {
+    this.network = NetworkManager.getInstance();
+    this.players.clear();
+    this.arrows = [];
+    this.roundEnded = false;
+    this.lastArrowCount = -1;
+
     this.buildLevel();
-    this.player = new Player(this, 240, 200);
-    this.physics.add.collider(this.player.sprite, this.platforms);
-
-    // Créer des mobs sur les plateformes
-    this.spawnMobs();
-
-    // Callback de tir
-    this.player.setOnShoot((x, y, dir) => {
-      const arrow = new Arrow(this, x, y, dir.x, dir.y, this.player.sprite);
-      this.arrows.push(arrow);
-
-      // Collision flèche → plateformes : la flèche se plante
-      this.physics.add.collider(arrow.sprite, this.platforms, () => {
-        arrow.stick();
-      });
-    });
-
-    // HUD : compteur de flèches
-    this.arrowHud = this.add.text(8, 8, '', {
-      fontSize: '12px',
-      color: '#f4a261',
-      fontFamily: 'monospace',
-    });
-    this.arrowHud.setScrollFactor(0);
-    this.arrowHud.setDepth(100);
-
-    // FPS counter (debug)
-    this.fpsText = this.add.text(8, 22, '', {
-      fontSize: '10px',
-      color: '#888888',
-      fontFamily: 'monospace',
-    });
-    this.fpsText.setScrollFactor(0);
-    this.fpsText.setDepth(100);
-
-    // Panneau de debug perf
-    this.debugText = this.add.text(8, 36, '', {
-      fontSize: '9px',
-      color: '#66cc66',
-      fontFamily: 'monospace',
-    });
-    this.debugText.setScrollFactor(0);
-    this.debugText.setDepth(100);
+    this.spawnPlayers();
+    this.setupLocalPlayerShooting();
+    this.setupNetworkListeners();
+    this.setupHUD();
   }
 
   private buildLevel() {
@@ -92,8 +52,6 @@ export class GameScene extends Phaser.Scene {
     const rows = LEVEL_1.length;
     const cols = LEVEL_1[0].length;
 
-    // Fusionner les tuiles verticalement adjacentes par colonne
-    // pour éliminer les coutures qui causent des collisions parasites
     for (let col = 0; col < cols; col++) {
       let runStart = -1;
       for (let row = 0; row <= rows; row++) {
@@ -112,56 +70,198 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnMobs() {
-    // Positions de spawn des mobs (sur les plateformes principales)
-    const spawnPoints = [
-      { x: 120, y: 300 },  // sur le sol gauche
-      { x: 360, y: 300 },  // sur le sol droite
-      { x: 240, y: 155 },  // sur la plateforme centrale
-      { x: 100, y: 210 },  // sur la plateforme gauche
-      { x: 350, y: 210 },  // sur la plateforme droite
-    ];
+  private spawnPlayers() {
+    const room = this.network.room;
+    if (!room) return;
 
-    for (const point of spawnPoints) {
-      const mob = new Mob(this, point.x, point.y);
-      this.physics.add.collider(mob.sprite, this.platforms);
-      this.mobs.push(mob);
+    for (const sp of this.spawnPoints) {
+      const info = room.players.find(p => p.id === sp.id);
+      if (!info) continue;
+
+      const isLocal = sp.id === this.network.playerId;
+      const player = new Player(this, sp.x, sp.y, {
+        color: info.color,
+        isRemote: !isLocal,
+        playerId: info.id,
+        playerName: info.name,
+      });
+
+      this.physics.add.collider(player.sprite, this.platforms);
+      this.players.set(info.id, player);
+
+      if (isLocal) {
+        this.localPlayer = player;
+      }
     }
   }
 
-  update(_time: number, delta: number) {
-    const t0 = performance.now();
-    if (this.playerDead) return;
+  private setupLocalPlayerShooting() {
+    if (!this.localPlayer) return;
 
-    this.perfTimings.getBoundsCount = 0;
+    this.localPlayer.setOnShoot((x, y, dir) => {
+      const arrow = new Arrow(this, x, y, dir.x, dir.y, this.localPlayer.sprite, undefined, this.network.playerId);
+      this.arrows.push(arrow);
 
-    // --- Player update ---
-    const tPlayer0 = performance.now();
-    this.player.update(delta);
-    this.perfTimings.playerUpdate = performance.now() - tPlayer0;
+      // Collision flèche → plateformes
+      this.physics.add.collider(arrow.sprite, this.platforms, () => {
+        arrow.stick();
+        // Notifier le réseau
+        this.network.sendArrowStuck(arrow.arrowId, arrow.sprite.x, arrow.sprite.y, arrow.sprite.rotation);
+      });
 
-    // --- Mobs update + collision mob → joueur ---
-    const tMobs0 = performance.now();
-    const playerBody = this.player.sprite.body as Phaser.Physics.Arcade.Body;
-    for (let i = this.mobs.length - 1; i >= 0; i--) {
-      const mob = this.mobs[i];
-      mob.update();
-      if (mob.alive && this.checkOverlap(mob.sprite, this.player.sprite)) {
-        if (this.isStomping(this.player.sprite, mob.sprite)) {
-          mob.die(true);
-          this.mobs.splice(i, 1);
-          playerBody.setVelocityY(-200);
-          this.stompEffect(mob.sprite.x, mob.sprite.y);
-        } else {
-          this.killPlayer();
-          return;
-        }
+      // Notifier le réseau du tir
+      this.network.sendArrowFired({
+        arrowId: arrow.arrowId,
+        ownerId: this.network.playerId,
+        x, y,
+        dirX: dir.x,
+        dirY: dir.y,
+      });
+    });
+  }
+
+  private setupNetworkListeners() {
+    // Mise à jour d'état des joueurs distants
+    this.network.onPlayerState((state: PlayerState) => {
+      const player = this.players.get(state.id);
+      if (player && player.isRemote) {
+        player.applyRemoteState(state);
       }
-    }
-    this.perfTimings.mobsUpdate = performance.now() - tMobs0;
+    });
 
-    // --- Arrows update + collisions ---
-    const tArrows0 = performance.now();
+    // Flèche tirée par un joueur distant
+    this.network.onArrowSpawned((data: ArrowData) => {
+      const owner = this.players.get(data.ownerId);
+      const arrow = new Arrow(this, data.x, data.y, data.dirX, data.dirY, owner?.sprite, data.arrowId, data.ownerId);
+      this.arrows.push(arrow);
+
+      this.physics.add.collider(arrow.sprite, this.platforms, () => {
+        arrow.stick();
+      });
+    });
+
+    // Flèche plantée (sync réseau)
+    this.network.onArrowStuckSync((arrowId, x, y, rotation) => {
+      const arrow = this.arrows.find(a => a.arrowId === arrowId);
+      if (arrow && !arrow.stuck) {
+        arrow.stickAt(x, y, rotation);
+      }
+    });
+
+    // Flèche ramassée par un joueur distant
+    this.network.onArrowPickedUp((arrowId, playerId) => {
+      const idx = this.arrows.findIndex(a => a.arrowId === arrowId);
+      if (idx !== -1) {
+        this.arrows[idx].destroy();
+        this.arrows.splice(idx, 1);
+      }
+      const player = this.players.get(playerId);
+      if (player) {
+        player.addArrow();
+      }
+    });
+
+    // Joueur tué
+    this.network.onPlayerDied((victimId, _killerId, method) => {
+      const victim = this.players.get(victimId);
+      if (victim) {
+        victim.die(method === 'stomp');
+      }
+    });
+
+    // Fin de round
+    this.network.onRoundOver((winnerId, winnerName) => {
+      this.roundEnded = true;
+      const isMe = winnerId === this.network.playerId;
+      const msg = winnerId === ''
+        ? 'ÉGALITÉ !'
+        : isMe ? 'VICTOIRE !' : `${winnerName} gagne !`;
+
+      this.roundOverText = this.add.text(
+        this.scale.width / 2, this.scale.height / 2,
+        msg,
+        {
+          fontSize: '24px',
+          color: isMe ? '#e9c46a' : '#ffffff',
+          fontFamily: 'monospace',
+          fontStyle: 'bold',
+          backgroundColor: '#000000aa',
+          padding: { x: 20, y: 10 },
+        },
+      ).setOrigin(0.5).setDepth(200);
+
+      // Retour au lobby après quelques secondes
+      this.time.delayedCall(3000, () => {
+        this.cleanupGame();
+        this.scene.start('LobbyScene', { mode: this.network.isHost ? 'host' : 'join', returning: true });
+      });
+    });
+
+    // Joueur déconnecté en cours de jeu
+    this.network.onPlayerDisconnected((playerId) => {
+      const player = this.players.get(playerId);
+      if (player) {
+        player.die();
+        this.players.delete(playerId);
+      }
+    });
+  }
+
+  private setupHUD() {
+    this.arrowHud = this.add.text(8, 8, '', {
+      fontSize: '12px',
+      color: '#f4a261',
+      fontFamily: 'monospace',
+    });
+    this.arrowHud.setScrollFactor(0);
+    this.arrowHud.setDepth(100);
+
+    this.fpsText = this.add.text(8, 22, '', {
+      fontSize: '10px',
+      color: '#888888',
+      fontFamily: 'monospace',
+    });
+    this.fpsText.setScrollFactor(0);
+    this.fpsText.setDepth(100);
+  }
+
+  update(time: number, delta: number) {
+    if (this.roundEnded) return;
+
+    // Update tous les joueurs
+    for (const player of this.players.values()) {
+      player.update(delta);
+    }
+
+    // Synchroniser l'état local à intervalle régulier
+    if (this.localPlayer?.alive && time - this.lastSyncTime >= SYNC_INTERVAL) {
+      this.lastSyncTime = time;
+      const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
+      this.network.sendPlayerUpdate({
+        id: this.network.playerId,
+        x: this.localPlayer.sprite.x,
+        y: this.localPlayer.sprite.y,
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+        facing: this.localPlayer.facing,
+        arrowCount: this.localPlayer.arrowCount,
+        alive: this.localPlayer.alive,
+      });
+    }
+
+    // Update et collisions des flèches
+    this.updateArrows();
+
+    // Stomp entre joueurs (le local détecte les stomps qu'il inflige)
+    this.checkStomps();
+
+    // HUD
+    this.updateHUD();
+  }
+
+  private updateArrows() {
+    const localId = this.network.playerId;
+
     for (let i = this.arrows.length - 1; i >= 0; i--) {
       const arrow = this.arrows[i];
       arrow.update();
@@ -169,117 +269,81 @@ export class GameScene extends Phaser.Scene {
       if (!arrow.stuck) {
         const tip = arrow.getTipPosition();
 
-        for (let j = this.mobs.length - 1; j >= 0; j--) {
-          const mob = this.mobs[j];
-          if (mob.alive && this.tipHitsSprite(tip, mob.sprite)) {
-            mob.die();
-            this.mobs.splice(j, 1);
-            break;
+        // Vérifier les kills par flèche — le joueur local détecte les hits sur les autres
+        // et les flèches des autres sur le joueur local
+        for (const [playerId, player] of this.players) {
+          if (!player.alive) continue;
+          // Une flèche ne peut pas tuer son propre tireur
+          if (arrow.ownerId === playerId) continue;
+
+          if (arrow.armed && this.tipHitsSprite(tip, player.sprite)) {
+            if (playerId === localId) {
+              // Le joueur local est touché par une flèche distante
+              // C'est le tireur (distant) qui devrait détecter, mais pour la réactivité
+              // on laisse le serveur gérer via l'événement du tireur
+              // On ne fait rien ici pour éviter les doubles détections
+            } else if (arrow.ownerId === localId) {
+              // Le joueur local a touché un joueur distant
+              this.network.sendPlayerHit(playerId, 'arrow');
+              player.die();
+            }
           }
         }
+      }
 
-        if (!arrow.stuck && arrow.armed && arrow.spawner !== this.player.sprite
-            && this.tipHitsSprite(tip, this.player.sprite)) {
-          this.killPlayer();
+      // Ramassage de flèches plantées par le joueur local
+      if (arrow.stuck && this.localPlayer?.alive) {
+        if (this.checkOverlap(this.localPlayer.sprite, arrow.sprite)) {
+          if (this.localPlayer.addArrow()) {
+            this.network.sendArrowPickup(arrow.arrowId);
+            arrow.destroy();
+            this.arrows.splice(i, 1);
+          }
         }
       }
+    }
+  }
 
-      if (arrow.stuck && this.checkOverlap(this.player.sprite, arrow.sprite)) {
-        if (this.player.addArrow()) {
-          arrow.destroy();
-          this.arrows.splice(i, 1);
+  private checkStomps() {
+    if (!this.localPlayer?.alive) return;
+
+    const localBody = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
+    const localId = this.network.playerId;
+
+    for (const [playerId, player] of this.players) {
+      if (playerId === localId || !player.alive) continue;
+
+      if (this.checkOverlap(this.localPlayer.sprite, player.sprite)) {
+        if (this.isStomping(this.localPlayer.sprite, player.sprite)) {
+          // Stomp !
+          this.network.sendPlayerHit(playerId, 'stomp');
+          player.die(true);
+          localBody.setVelocityY(-200);
+          this.stompEffect(player.sprite.x, player.sprite.y);
+        } else if (this.isStomping(player.sprite, this.localPlayer.sprite)) {
+          // Le joueur distant nous stomp — le distant détectera ça de son côté
+          // On ne fait rien ici pour éviter les doubles détections
         }
       }
     }
-    this.perfTimings.arrowsUpdate = performance.now() - tArrows0;
-
-    // --- HUD update ---
-    const tHud0 = performance.now();
-    // Arrow HUD : dirty flag
-    if (this.player.arrowCount !== this.lastArrowCount) {
-      this.arrowHud.setText('▲ '.repeat(this.player.arrowCount).trim());
-      this.lastArrowCount = this.player.arrowCount;
-    }
-    // FPS + debug : update toutes les 500ms seulement
-    const now = _time;
-    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | arrows: ${this.arrows.length} | mobs: ${this.mobs.length}`);
-    this.perfTimings.hudUpdate = performance.now() - tHud0;
-
-    this.perfTimings.totalUpdate = performance.now() - t0;
-
-    // Compteurs de santé
-    this.perfTimings.colliderCount = (this.physics.world as any)._colliders?.length
-      ?? (this.physics.world.colliders as any)?.getActive?.()?.length ?? -1;
-    this.perfTimings.gameObjectCount = this.children.length;
-
-    // Accumulation pour affichage moyenné
-    for (const key of Object.keys(this.perfTimings) as (keyof typeof this.perfTimings)[]) {
-      this.perfAccum[key] += this.perfTimings[key];
-    }
-    this.perfFrameCount++;
-
-    // Affichage debug toutes les 500ms
-    if (now - this.lastPerfDisplay >= 500) {
-      const n = this.perfFrameCount || 1;
-      const avg = (k: keyof typeof this.perfTimings) => (this.perfAccum[k] / n).toFixed(2);
-      this.debugText.setText(
-        `update: ${avg('totalUpdate')}ms\n` +
-        `  player: ${avg('playerUpdate')}ms\n` +
-        `  mobs:   ${avg('mobsUpdate')}ms\n` +
-        `  arrows: ${avg('arrowsUpdate')}ms\n` +
-        `  hud:    ${avg('hudUpdate')}ms\n` +
-        `getBounds: ${avg('getBoundsCount')}/frame\n` +
-        `colliders: ${Math.round(this.perfAccum.colliderCount / n)}\n` +
-        `objects:   ${Math.round(this.perfAccum.gameObjectCount / n)}`
-      );
-      this.lastPerfDisplay = now;
-      // Reset accum
-      for (const key of Object.keys(this.perfAccum) as (keyof typeof this.perfAccum)[]) {
-        this.perfAccum[key] = 0;
-      }
-      this.perfFrameCount = 0;
-    }
   }
 
-  private killPlayer() {
-    this.playerDead = true;
-    const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
-    body.setVelocity(0, 0);
-    body.setAllowGravity(false);
-    body.setEnable(false);
-
-    // Animation de mort du joueur
-    this.tweens.add({
-      targets: this.player.sprite,
-      alpha: 0,
-      scaleX: 1.5,
-      scaleY: 1.5,
-      duration: 400,
-      ease: 'Power2',
-      onComplete: () => {
-        // Respawn après un délai
-        this.time.delayedCall(800, () => {
-          this.respawnPlayer();
-        });
-      },
-    });
+  private updateHUD() {
+    if (this.localPlayer && this.localPlayer.arrowCount !== this.lastArrowCount) {
+      this.arrowHud.setText('▲ '.repeat(this.localPlayer.arrowCount).trim());
+      this.lastArrowCount = this.localPlayer.arrowCount;
+    }
+    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | flèches: ${this.arrows.length} | joueurs: ${this.countAlivePlayers()}/${this.players.size}`);
   }
 
-  private respawnPlayer() {
-    this.player.sprite.setPosition(240, 200);
-    this.player.sprite.setAlpha(1);
-    this.player.sprite.setScale(1);
-    const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
-    body.setEnable(true);
-    body.setAllowGravity(true);
-    body.setVelocity(0, 0);
-    this.playerDead = false;
+  private countAlivePlayers(): number {
+    let count = 0;
+    for (const p of this.players.values()) {
+      if (p.alive) count++;
+    }
+    return count;
   }
 
-  /**
-   * Détecte si le sprite A est en train de piétiner le sprite B.
-   * Conditions : A tombe (vélocité Y > 0) et le bas de A est dans la moitié haute de B.
-   */
   private isStomping(
     stomper: Phaser.Physics.Arcade.Sprite,
     target: Phaser.Physics.Arcade.Sprite,
@@ -287,7 +351,6 @@ export class GameScene extends Phaser.Scene {
     const stomperBody = stomper.body as Phaser.Physics.Arcade.Body;
     if (stomperBody.velocity.y <= 0) return false;
 
-    this.perfTimings.getBoundsCount += 2;
     const stomperBounds = stomper.getBounds();
     const targetBounds = target.getBounds();
     const targetMidY = targetBounds.y + targetBounds.height / 2;
@@ -296,7 +359,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private stompEffect(x: number, y: number) {
-    // Particules d'écrasement : petits éclats autour du point de stomp
     for (let i = 0; i < 6; i++) {
       const particle = this.add.rectangle(
         x + Phaser.Math.Between(-8, 8),
@@ -319,12 +381,10 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Vérifie si un point (la pointe de la flèche) est dans les bounds d'un sprite */
   private tipHitsSprite(
     tip: { x: number; y: number },
     target: Phaser.Physics.Arcade.Sprite,
   ): boolean {
-    this.perfTimings.getBoundsCount++;
     const bounds = target.getBounds();
     return bounds.contains(tip.x, tip.y);
   }
@@ -333,9 +393,25 @@ export class GameScene extends Phaser.Scene {
     a: Phaser.Physics.Arcade.Sprite,
     b: Phaser.Physics.Arcade.Sprite,
   ): boolean {
-    this.perfTimings.getBoundsCount += 2;
     const boundsA = a.getBounds();
     const boundsB = b.getBounds();
     return Phaser.Geom.Intersects.RectangleToRectangle(boundsA, boundsB);
+  }
+
+  private cleanupGame() {
+    this.network.removeAllGameListeners();
+    for (const player of this.players.values()) {
+      player.destroy();
+    }
+    this.players.clear();
+    for (const arrow of this.arrows) {
+      arrow.destroy();
+    }
+    this.arrows = [];
+    this.roundOverText?.destroy();
+  }
+
+  shutdown() {
+    this.cleanupGame();
   }
 }

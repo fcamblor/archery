@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { ClientEvents, ServerEvents, RoomInfo, PlayerInfo } from '../shared/types';
+import type { ClientEvents, ServerEvents, RoomInfo, PlayerInfo, PlayerState, ArrowData } from '../shared/types';
 
 // Le serveur Socket.io tourne sur le même hôte que la page, port 3001
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
@@ -77,6 +77,8 @@ export class NetworkManager {
     this.socket.emit('start-game');
   }
 
+  // --- Lobby events ---
+
   onPlayerJoined(cb: (player: PlayerInfo) => void) {
     this.socket.on('player-joined', cb);
   }
@@ -85,14 +87,80 @@ export class NetworkManager {
     this.socket.on('player-left', cb);
   }
 
-  onGameStarting(cb: () => void) {
+  onGameStarting(cb: (spawnPoints: { id: string; x: number; y: number }[]) => void) {
     this.socket.on('game-starting', cb);
   }
+
+  // --- Gameplay events: send ---
+
+  sendPlayerUpdate(state: PlayerState) {
+    this.socket.emit('player-update', state);
+  }
+
+  sendArrowFired(data: ArrowData) {
+    this.socket.emit('arrow-fired', data);
+  }
+
+  sendArrowStuck(arrowId: string, x: number, y: number, rotation: number) {
+    this.socket.emit('arrow-stuck', arrowId, x, y, rotation);
+  }
+
+  sendArrowPickup(arrowId: string) {
+    this.socket.emit('arrow-pickup', arrowId);
+  }
+
+  sendPlayerHit(victimId: string, method: 'arrow' | 'stomp') {
+    this.socket.emit('player-hit', victimId, method);
+  }
+
+  // --- Gameplay events: receive ---
+
+  onPlayerState(cb: (state: PlayerState) => void) {
+    this.socket.on('player-state', cb);
+  }
+
+  onArrowSpawned(cb: (data: ArrowData) => void) {
+    this.socket.on('arrow-spawned', cb);
+  }
+
+  onArrowStuckSync(cb: (arrowId: string, x: number, y: number, rotation: number) => void) {
+    this.socket.on('arrow-stuck-sync', cb);
+  }
+
+  onArrowPickedUp(cb: (arrowId: string, playerId: string) => void) {
+    this.socket.on('arrow-picked-up', cb);
+  }
+
+  onPlayerDied(cb: (victimId: string, killerId: string, method: 'arrow' | 'stomp') => void) {
+    this.socket.on('player-died', cb);
+  }
+
+  onPlayerRespawned(cb: (playerId: string, x: number, y: number) => void) {
+    this.socket.on('player-respawned', cb);
+  }
+
+  onRoundOver(cb: (winnerId: string, winnerName: string) => void) {
+    this.socket.on('round-over', cb);
+  }
+
+  onPlayerDisconnected(cb: (playerId: string) => void) {
+    this.socket.on('player-disconnected', cb);
+  }
+
+  // --- Cleanup ---
 
   removeAllGameListeners() {
     this.socket.off('player-joined');
     this.socket.off('player-left');
     this.socket.off('game-starting');
+    this.socket.off('player-state');
+    this.socket.off('arrow-spawned');
+    this.socket.off('arrow-stuck-sync');
+    this.socket.off('arrow-picked-up');
+    this.socket.off('player-died');
+    this.socket.off('player-respawned');
+    this.socket.off('round-over');
+    this.socket.off('player-disconnected');
   }
 
   disconnect() {

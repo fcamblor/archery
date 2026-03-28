@@ -1,6 +1,6 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import type { PlayerInfo, RoomInfo, ClientEvents, ServerEvents } from '../src/shared/types';
+import type { PlayerInfo, RoomInfo, ClientEvents, ServerEvents, PlayerState } from '../src/shared/types';
 
 const PORT = 3001;
 
@@ -11,7 +11,7 @@ const io = new Server<ClientEvents, ServerEvents>(httpServer, {
 
 // Couleurs disponibles pour les joueurs
 const PLAYER_COLORS = [
-  0xe76f51, // orange-rouge (joueur actuel)
+  0xe76f51, // orange-rouge
   0x2a9d8f, // vert-bleu
   0xe9c46a, // jaune
   0x264653, // bleu foncé
@@ -19,10 +19,22 @@ const PLAYER_COLORS = [
   0x9b5de5, // violet
 ];
 
+// Points de spawn répartis sur le niveau
+const SPAWN_POINTS = [
+  { x: 120, y: 300 },
+  { x: 360, y: 300 },
+  { x: 240, y: 155 },
+  { x: 100, y: 100 },
+  { x: 380, y: 100 },
+  { x: 240, y: 250 },
+];
+
 // Stockage des rooms
 const rooms = new Map<string, RoomInfo>();
 // Mapping socketId → roomCode
 const playerRooms = new Map<string, string>();
+// Joueurs vivants par room (pour détection de victoire)
+const alivePlayersInRoom = new Map<string, Set<string>>();
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -33,6 +45,24 @@ function generateRoomCode(): string {
   // Éviter les collisions
   if (rooms.has(code)) return generateRoomCode();
   return code;
+}
+
+function checkRoundOver(code: string) {
+  const alive = alivePlayersInRoom.get(code);
+  const room = rooms.get(code);
+  if (!alive || !room) return;
+
+  // Il faut au moins 2 joueurs dans la room pour un round
+  if (room.players.length < 2) return;
+
+  if (alive.size === 1) {
+    const winnerId = [...alive][0];
+    const winner = room.players.find(p => p.id === winnerId);
+    io.to(code).emit('round-over', winnerId, winner?.name || 'Inconnu');
+  } else if (alive.size === 0) {
+    // Tout le monde est mort simultanément — pas de gagnant
+    io.to(code).emit('round-over', '', 'Personne');
+  }
 }
 
 io.on('connection', (socket) => {
@@ -91,8 +121,64 @@ io.on('connection', (socket) => {
     if (!room) return;
     if (room.hostId !== socket.id) return;
 
-    console.log(`Partie lancée dans la room ${code}`);
-    io.to(code).emit('game-starting');
+    // Attribuer les spawn points
+    const spawnPoints = room.players.map((p, i) => ({
+      id: p.id,
+      x: SPAWN_POINTS[i % SPAWN_POINTS.length].x,
+      y: SPAWN_POINTS[i % SPAWN_POINTS.length].y,
+    }));
+
+    // Initialiser le tracking des joueurs vivants
+    const alive = new Set(room.players.map(p => p.id));
+    alivePlayersInRoom.set(code, alive);
+
+    console.log(`Partie lancée dans la room ${code} avec ${room.players.length} joueurs`);
+    io.to(code).emit('game-starting', spawnPoints);
+  });
+
+  // --- Événements gameplay ---
+
+  socket.on('player-update', (state: PlayerState) => {
+    const code = playerRooms.get(socket.id);
+    if (!code) return;
+    // Relayer à tous les autres joueurs de la room
+    socket.to(code).emit('player-state', state);
+  });
+
+  socket.on('arrow-fired', (data) => {
+    const code = playerRooms.get(socket.id);
+    if (!code) return;
+    socket.to(code).emit('arrow-spawned', data);
+  });
+
+  socket.on('arrow-stuck', (arrowId, x, y, rotation) => {
+    const code = playerRooms.get(socket.id);
+    if (!code) return;
+    socket.to(code).emit('arrow-stuck-sync', arrowId, x, y, rotation);
+  });
+
+  socket.on('arrow-pickup', (arrowId) => {
+    const code = playerRooms.get(socket.id);
+    if (!code) return;
+    socket.to(code).emit('arrow-picked-up', arrowId, socket.id);
+  });
+
+  socket.on('player-hit', (victimId, method) => {
+    const code = playerRooms.get(socket.id);
+    if (!code) return;
+
+    // Marquer la victime comme morte
+    const alive = alivePlayersInRoom.get(code);
+    if (alive) {
+      alive.delete(victimId);
+    }
+
+    io.to(code).emit('player-died', victimId, socket.id, method);
+    checkRoundOver(code);
+  });
+
+  socket.on('player-respawned', () => {
+    // En mode round, pas de respawn — mais on garde pour compatibilité future
   });
 
   socket.on('disconnect', () => {
@@ -104,8 +190,15 @@ io.on('connection', (socket) => {
     room.players = room.players.filter((p) => p.id !== socket.id);
     playerRooms.delete(socket.id);
 
+    // Retirer des joueurs vivants
+    const alive = alivePlayersInRoom.get(code);
+    if (alive) {
+      alive.delete(socket.id);
+    }
+
     if (room.players.length === 0) {
       rooms.delete(code);
+      alivePlayersInRoom.delete(code);
       console.log(`Room ${code} supprimée (vide)`);
     } else {
       // Si l'hôte quitte, transférer au premier joueur restant
@@ -114,6 +207,12 @@ io.on('connection', (socket) => {
         console.log(`Nouvel hôte dans ${code}: ${room.players[0].name}`);
       }
       io.to(code).emit('player-left', socket.id);
+      io.to(code).emit('player-disconnected', socket.id);
+
+      // Vérifier si le round est terminé après déconnexion
+      if (alive) {
+        checkRoundOver(code);
+      }
     }
     console.log(`Joueur déconnecté: ${socket.id}`);
   });

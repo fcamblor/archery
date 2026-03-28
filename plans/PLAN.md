@@ -37,14 +37,17 @@
 - [x] Lancement de la partie par l'hôte
 - [x] Choix du nom de joueur (max 12 caractères) avant de créer ou rejoindre une partie
 
-## Itération 6 — Multijoueur réseau (2-6 joueurs)
-- [ ] Synchronisation des états joueurs via le serveur (positions, actions)
-- [ ] Chaque joueur contrôle son archer sur son propre device
-- [ ] Gestion autoritative ou semi-autoritative des collisions/kills
-- [ ] Attribution de couleurs/sprites distincts par joueur
-- [ ] Détection de victoire : dernier survivant gagne le round
-- [ ] Kill par flèche entre joueurs (remplace les mobs cibles)
-- [ ] Kill par piétinement entre joueurs
+## Itération 6 — Multijoueur réseau (2-6 joueurs) ✅
+- [x] Synchronisation des états joueurs via le serveur (positions, actions)
+- [x] Chaque joueur contrôle son archer sur son propre device
+- [x] Gestion semi-autoritative des collisions/kills (détection locale, relayée par serveur)
+- [x] Attribution de couleurs/sprites distincts par joueur
+- [x] Détection de victoire : dernier survivant gagne le round
+- [x] Kill par flèche entre joueurs (remplace les mobs cibles)
+- [x] Kill par piétinement entre joueurs
+- [x] Noms de joueurs affichés au-dessus des sprites
+- [x] Synchronisation des flèches (tir, plantage, ramassage)
+- [x] Retour au lobby après fin de round
 
 ## Itération 7 — Niveaux multiples
 - [ ] 3-4 niveaux avec designs de plateformes variés

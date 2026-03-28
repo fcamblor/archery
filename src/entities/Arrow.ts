@@ -10,6 +10,8 @@ export class Arrow {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public stuck = false;
   public armed = false;
+  public arrowId: string;
+  public ownerId: string;
   private scene: Phaser.Scene;
   private spawnTime: number;
   private gravityEnabled = false;
@@ -18,9 +20,12 @@ export class Arrow {
   public spawner?: Phaser.Physics.Arcade.Sprite;
 
   private static textureCreated = false;
+  private static idCounter = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, dirX: number, dirY: number, spawner?: Phaser.Physics.Arcade.Sprite) {
+  constructor(scene: Phaser.Scene, x: number, y: number, dirX: number, dirY: number, spawner?: Phaser.Physics.Arcade.Sprite, arrowId?: string, ownerId?: string) {
     this.scene = scene;
+    this.arrowId = arrowId ?? `arrow_${Date.now()}_${Arrow.idCounter++}`;
+    this.ownerId = ownerId ?? '';
 
     if (!Arrow.textureCreated) {
       const gfx = scene.add.graphics();
@@ -109,6 +114,18 @@ export class Arrow {
       // Impact vertical : décaler en Y
       this.sprite.y += Math.sign(this.lastVy) * EMBED_DEPTH;
     }
+  }
+
+  /** Forcer la flèche à se planter à une position donnée (sync réseau) */
+  stickAt(x: number, y: number, rotation: number) {
+    if (this.stuck) return;
+    this.stuck = true;
+    this.sprite.setPosition(x, y);
+    this.sprite.rotation = rotation;
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(0, 0);
+    body.setAllowGravity(false);
+    body.setImmovable(true);
   }
 
   private wrapAround() {

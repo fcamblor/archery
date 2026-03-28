@@ -8,15 +8,15 @@ src/
   scenes/
     TitleScene.ts    — Écran titre (Héberger / Rejoindre)
     LobbyScene.ts    — Lobby (joueurs connectés, code, lancement)
-    GameScene.ts     — Scène de jeu principale
+    GameScene.ts     — Scène de jeu principale (multijoueur réseau)
   entities/          — Entités de jeu (Player, Arrow, Mob)
   network/
-    NetworkManager.ts — Singleton Socket.io (connexion, rooms, événements)
+    NetworkManager.ts — Singleton Socket.io (connexion, rooms, gameplay)
   shared/
-    types.ts         — Types partagés client/serveur (PlayerInfo, RoomInfo, événements)
+    types.ts         — Types partagés client/serveur (PlayerInfo, RoomInfo, événements gameplay)
   levels/            — Données de niveaux (grilles number[][])
 server/
-  index.ts           — Serveur Node.js + Socket.io (rooms, lobby, lancement)
+  index.ts           — Serveur Node.js + Socket.io (rooms, lobby, relay gameplay, victoire)
   tsconfig.json      — Config TypeScript serveur
 ```
 
@@ -24,10 +24,30 @@ server/
 
 - **Serveur** : Node.js + Socket.io sur le port 3001 (`npm run dev:server`).
 - **Client** : Socket.io-client via `NetworkManager` (singleton).
-- **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene.
+- **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene → LobbyScene (retour après round).
 - **Rooms** : code à 4 caractères, max 6 joueurs. L'hôte crée la room et lance la partie. Si l'hôte quitte, le rôle est transféré au premier joueur restant.
 - **Nom du joueur** : saisie via input HTML (max 12 caractères) dans le lobby, avant la création/join de room. Le nom est transmis au serveur via les événements `create-room` / `join-room`.
 - Les types partagés (`src/shared/types.ts`) définissent les événements client↔serveur de manière typée.
+
+## Modèle de synchronisation réseau (itération 6)
+
+### Architecture semi-autoritative (relay)
+
+Le serveur agit principalement comme un relais. Chaque client exécute sa propre simulation physique localement.
+
+- **État joueur** : le joueur local envoie sa position/vélocité au serveur à 20 Hz (`player-update`). Le serveur relaie à tous les autres clients (`player-state`).
+- **Flèches** : le tireur envoie `arrow-fired` au tir, `arrow-stuck` au plantage, `arrow-pickup` au ramassage. Le serveur relaie à tous les autres.
+- **Kills** : le client de l'attaquant détecte le hit localement et envoie `player-hit`. Le serveur broadcast `player-died` à tous.
+- **Victoire** : le serveur maintient un `Set` des joueurs vivants par room. Quand il ne reste qu'un survivant, il émet `round-over`.
+
+### Joueurs locaux vs distants
+
+- **Joueur local** : contrôlé par le clavier, physique Arcade complète. Envoie son état au réseau.
+- **Joueurs distants** : pas de contrôle clavier, position appliquée directement depuis les messages réseau (`applyRemoteState`). Physique arcade active uniquement pour les collisions avec les plateformes.
+
+### Points de spawn
+
+Le serveur attribue un point de spawn fixe à chaque joueur au lancement (6 positions prédéfinies réparties sur le niveau). Les spawn points sont envoyés via l'événement `game-starting`.
 
 ## Physique
 
@@ -37,14 +57,15 @@ server/
 ## Flèches
 
 - Entité `Arrow` (`src/entities/Arrow.ts`) : sprite avec physique arcade, rotation alignée sur la vélocité.
+- Chaque flèche possède un `arrowId` unique (pour la synchronisation réseau) et un `ownerId` (identifiant du tireur).
 - Body physique carré (4x4) indépendant du sprite visuel (10x3) pour une collision précise quelle que soit la rotation.
 - Visée 8 directions via W/S (haut/bas) combiné avec A/D (gauche/droite) au moment du tir (O). Sans direction, tir dans la direction du regard. Le saut est assigné à la touche K (séparé de la visée vers le haut).
 - Trajectoire : départ horizontal (gravité désactivée pendant 120ms), puis courbe parabolique. Vitesse plafonnée à `ARROW_SPEED` (500 px/s) via `setMaxSpeed` pour éviter le tunneling à travers les plateformes.
 - **Collision par la pointe** : seule la pointe de la flèche (extrémité avant dans la direction de vol, calculée par `getTipPosition()`) peut tuer. La détection utilise un test point-dans-rectangle (`tipHitsSprite`) au lieu d'un overlap de body complet.
-- **Protection du tireur** : une flèche en vol ne peut pas tuer son propre tireur (référence `spawner` sur l'Arrow, vérifiée dans GameScene).
-- Les flèches se plantent dans les plateformes (`collider` → vélocité 0, gravité désactivée, puis décalage de 4px dans la direction de vol pour enfoncement visuel).
-- Les flèches traversent les mobs sans se planter (le mob meurt, la flèche continue).
-- Les flèches plantées sont ramassables par le joueur (overlap détecté dans `GameScene.update`).
+- **Protection du tireur** : une flèche en vol ne peut pas tuer son propre tireur (vérifié via `ownerId`).
+- Les flèches se plantent dans les plateformes (`collider` → vélocité 0, gravité désactivée, puis décalage de 4px dans la direction de vol pour enfoncement visuel). Méthode `stickAt()` pour la synchronisation réseau.
+- Les flèches traversent les joueurs tués (la flèche continue).
+- Les flèches plantées sont ramassables par n'importe quel joueur (overlap détecté dans `GameScene.update`).
 - Délai d'armement de 100ms après le tir.
 - Stock initial : 4 flèches, max : 8. Compteur affiché en HUD (texte en haut à gauche).
 - Wrap-around identique au joueur sur les 4 bords.
@@ -56,29 +77,32 @@ Les plateformes aux bords doivent être cohérentes avec le wrap-around.
 
 Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lors du `buildLevel` pour éviter les collisions parasites aux coutures entre tuiles individuelles.
 
-## Mobs
+## Joueurs
 
-- Entité `Mob` (`src/entities/Mob.ts`) : cibles mobiles qui patrouillent sur les plateformes.
-- Déplacement horizontal à vitesse constante, inversion de direction au contact d'un mur. Les mobs tombent des plateformes (pas de détection de bord).
-- Wrap-around sur les 4 bords (même logique que joueur et flèches).
-- Tués par la pointe d'une flèche en vol (animation de mort : expansion + fade out).
-- Collision pointe-flèche→mob détectée via `tipHitsSprite` dans `GameScene.update`.
-- Contact mob→joueur : tue le joueur (détecté via `checkOverlap` dans `GameScene.update`).
+- Entité `Player` (`src/entities/Player.ts`) : sprite avec physique arcade, couleur configurable, nom affiché au-dessus.
+- Mode local (contrôle clavier) ou remote (état réseau).
+- Méthodes `die(stomped?)` et `respawn(x, y)` pour la gestion de la mort/résurrection.
+- Chaque joueur a un `playerId` correspondant à son socket ID.
 
 ## Mort du joueur
 
-- Le joueur peut être tué par la pointe d'une flèche d'un autre joueur (pas par sa propre flèche), ou par contact direct avec un mob.
-- La flèche qui tue le joueur continue sa trajectoire (même comportement que pour les mobs).
-- Animation de mort identique aux mobs. Respawn automatique après un court délai.
-- Le nombre de flèches est conservé au respawn (pas de réinitialisation).
+- Un joueur peut être tué par la pointe d'une flèche d'un autre joueur (pas par sa propre flèche), ou par piétinement (stomp).
+- La détection de kill est faite par le client de l'attaquant, qui envoie `player-hit` au serveur.
+- Animation de mort : expansion + fade out (flèche) ou écrasement (stomp).
+- Pas de respawn dans un round — le joueur reste mort jusqu'à la fin du round.
 
 ## Stomp (piétinement)
 
-- Un joueur qui tombe (vélocité Y > 0) sur la moitié haute d'un mob le tue par piétinement.
+- Un joueur qui tombe (vélocité Y > 0) sur la moitié haute d'un autre joueur le tue par piétinement.
 - Après un stomp, le joueur rebondit vers le haut (impulsion de -200).
-- Animation de stomp spécifique : écrasement horizontal du mob (scaleX 1.8, scaleY 0.2) + particules jaunes autour du point d'impact.
+- Animation de stomp spécifique : écrasement horizontal du joueur (scaleX 1.8, scaleY 0.2) + particules jaunes autour du point d'impact.
 - La détection se base sur la position du bas du joueur par rapport au centre vertical de la cible.
-- La mécanique est prête pour le multijoueur (stomp entre joueurs).
+
+## Condition de victoire
+
+- Dernier joueur survivant gagne le round.
+- Le serveur track les joueurs vivants et émet `round-over` quand il ne reste qu'un seul survivant (ou zéro en cas d'égalité).
+- Après 3 secondes d'affichage du résultat, retour automatique au lobby.
 
 ## Outils de développement
 

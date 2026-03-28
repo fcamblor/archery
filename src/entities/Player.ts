@@ -10,44 +10,79 @@ const MAX_ARROWS = 8;
 
 export type AimDirection = { x: number; y: number };
 
+export interface PlayerOptions {
+  color?: number;
+  isRemote?: boolean;
+  playerId?: string;
+  playerName?: string;
+}
+
 export class Player {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public arrowCount = INITIAL_ARROWS;
-  private leftKey: Phaser.Input.Keyboard.Key;
-  private rightKey: Phaser.Input.Keyboard.Key;
-  private upKey: Phaser.Input.Keyboard.Key;
-  private downKey: Phaser.Input.Keyboard.Key;
-  private shootKey: Phaser.Input.Keyboard.Key;
-  private jumpKey: Phaser.Input.Keyboard.Key;
+  public playerId: string;
+  public playerName: string;
+  public isRemote: boolean;
+  public alive = true;
+  public facing: 'left' | 'right' = 'right';
+
+  private leftKey!: Phaser.Input.Keyboard.Key;
+  private rightKey!: Phaser.Input.Keyboard.Key;
+  private upKey!: Phaser.Input.Keyboard.Key;
+  private downKey!: Phaser.Input.Keyboard.Key;
+  private shootKey!: Phaser.Input.Keyboard.Key;
+  private jumpKey!: Phaser.Input.Keyboard.Key;
   private scene: Phaser.Scene;
-  private gfx: Phaser.GameObjects.Graphics;
   private isClinging = false;
   private clingDirection: 'left' | 'right' | null = null;
   private wallJumpCooldown = 0;
-  private facing: 'left' | 'right' = 'right';
   private onShoot?: (x: number, y: number, dir: AimDirection) => void;
+  private color: number;
+  private nameText: Phaser.GameObjects.Text;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  // Compteur de textures pour éviter les collisions de noms
+  private static textureIndex = 0;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, opts: PlayerOptions = {}) {
     this.scene = scene;
+    this.color = opts.color ?? 0xe76f51;
+    this.isRemote = opts.isRemote ?? false;
+    this.playerId = opts.playerId ?? '';
+    this.playerName = opts.playerName ?? 'Joueur';
 
-    // Créer une texture placeholder pour le joueur
-    this.gfx = scene.add.graphics();
-    this.gfx.fillStyle(0xe76f51);
-    this.gfx.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
-    this.gfx.generateTexture('player', PLAYER_SIZE, PLAYER_SIZE);
-    this.gfx.destroy();
+    // Créer une texture unique par couleur
+    const texKey = `player_${Player.textureIndex++}`;
+    const gfx = scene.add.graphics();
+    gfx.fillStyle(this.color);
+    gfx.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
+    // Yeux blancs pour distinguer la direction
+    gfx.fillStyle(0xffffff);
+    gfx.fillRect(7, 2, 3, 3);
+    gfx.fillRect(2, 2, 3, 3);
+    gfx.generateTexture(texKey, PLAYER_SIZE, PLAYER_SIZE);
+    gfx.destroy();
 
-    this.sprite = scene.physics.add.sprite(x, y, 'player');
+    this.sprite = scene.physics.add.sprite(x, y, texKey);
     this.sprite.setSize(PLAYER_SIZE, PLAYER_SIZE);
     this.sprite.setBounce(0);
     this.sprite.setCollideWorldBounds(false);
 
-    this.leftKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.rightKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.upKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.downKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
-    this.shootKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.O);
-    this.jumpKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K);
+    // Nom au-dessus du joueur
+    this.nameText = scene.add.text(x, y - 12, this.playerName, {
+      fontSize: '7px',
+      color: `#${this.color.toString(16).padStart(6, '0')}`,
+      fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    // Les joueurs locaux ont des contrôles clavier
+    if (!this.isRemote) {
+      this.leftKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+      this.rightKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+      this.upKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+      this.downKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+      this.shootKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+      this.jumpKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K);
+    }
   }
 
   setOnShoot(callback: (x: number, y: number, dir: AimDirection) => void) {
@@ -61,6 +96,12 @@ export class Player {
   }
 
   update(_delta: number) {
+    // Mettre à jour le nom au-dessus du sprite
+    this.nameText.setPosition(this.sprite.x, this.sprite.y - 12);
+    this.nameText.setVisible(this.alive);
+
+    if (this.isRemote || !this.alive) return;
+
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
     // Déplacement horizontal (désactivé pendant l'éjection du wall jump)
@@ -109,6 +150,60 @@ export class Player {
 
     // Wrap-around sur tous les bords
     this.wrapAround();
+  }
+
+  /** Appliquer un état reçu du réseau (joueur remote) */
+  applyRemoteState(state: { x: number; y: number; vx: number; vy: number; facing: 'left' | 'right'; arrowCount: number }) {
+    if (!this.isRemote) return;
+    // Interpolation simple : placement direct
+    this.sprite.setPosition(state.x, state.y);
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(state.vx, state.vy);
+    this.facing = state.facing;
+    this.arrowCount = state.arrowCount;
+  }
+
+  die(stomped = false) {
+    if (!this.alive) return;
+    this.alive = false;
+    this.nameText.setVisible(false);
+
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(0, 0);
+    body.setAllowGravity(false);
+    body.setEnable(false);
+
+    if (stomped) {
+      this.scene.tweens.add({
+        targets: this.sprite,
+        alpha: 0,
+        scaleX: 1.8,
+        scaleY: 0.2,
+        duration: 250,
+        ease: 'Power2',
+      });
+    } else {
+      this.scene.tweens.add({
+        targets: this.sprite,
+        alpha: 0,
+        scaleX: 1.5,
+        scaleY: 1.5,
+        duration: 400,
+        ease: 'Power2',
+      });
+    }
+  }
+
+  respawn(x: number, y: number) {
+    this.alive = true;
+    this.sprite.setPosition(x, y);
+    this.sprite.setAlpha(1);
+    this.sprite.setScale(1);
+    this.nameText.setVisible(true);
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setEnable(true);
+    body.setAllowGravity(true);
+    body.setVelocity(0, 0);
   }
 
   private getAimDirection(): AimDirection {
@@ -163,5 +258,10 @@ export class Player {
     } else if (this.sprite.y > height + halfH) {
       this.sprite.y = -halfH;
     }
+  }
+
+  destroy() {
+    this.sprite.destroy();
+    this.nameText.destroy();
   }
 }
