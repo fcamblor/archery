@@ -9,7 +9,7 @@ export class TitleScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     // Titre
-    this.add.text(width / 2, height * 0.25, 'TOWERFALL', {
+    this.add.text(width / 2, height * 0.25, 'Archery', {
       fontSize: '32px',
       color: '#e76f51',
       fontFamily: 'monospace',
@@ -17,7 +17,7 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Sous-titre
-    this.add.text(width / 2, height * 0.35, 'PhaserJS Edition', {
+    this.add.text(width / 2, height * 0.35, 'By Naïa & Fred', {
       fontSize: '12px',
       color: '#f4a261',
       fontFamily: 'monospace',
