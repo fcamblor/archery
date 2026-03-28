@@ -336,6 +336,7 @@ export class GameScene extends Phaser.Scene {
               // Le joueur local se tue avec sa propre flèche retombante
               this.network.sendPlayerHit(localId, 'arrow');
               player.die();
+              arrow.stickAt(player.sprite.x, player.sprite.y, arrow.sprite.rotation);
             } else if (playerId === localId) {
               // Le joueur local est touché par une flèche distante
               // C'est le tireur (distant) qui devrait détecter, mais pour la réactivité
@@ -345,6 +346,8 @@ export class GameScene extends Phaser.Scene {
               // Le joueur local a touché un joueur distant
               this.network.sendPlayerHit(playerId, 'arrow');
               player.die();
+              arrow.stickAt(player.sprite.x, player.sprite.y, arrow.sprite.rotation);
+              this.network.sendArrowStuck(arrow.arrowId, arrow.sprite.x, arrow.sprite.y, arrow.sprite.rotation);
             }
           }
         }

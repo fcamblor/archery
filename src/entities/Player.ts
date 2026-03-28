@@ -199,11 +199,12 @@ export class Player {
     this.arrowText.setVisible(false);
 
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-    body.setVelocity(0, 0);
-    body.setAllowGravity(false);
-    body.setEnable(false);
 
     if (stomped) {
+      // Mort par piétinement : écraser et faire disparaître
+      body.setVelocity(0, 0);
+      body.setAllowGravity(false);
+      body.setEnable(false);
       this.scene.tweens.add({
         targets: this.sprite,
         alpha: 0,
@@ -213,14 +214,13 @@ export class Player {
         ease: 'Power2',
       });
     } else {
-      this.scene.tweens.add({
-        targets: this.sprite,
-        alpha: 0,
-        scaleX: 1.5,
-        scaleY: 1.5,
-        duration: 400,
-        ease: 'Power2',
-      });
+      // Mort par flèche : cadavre qui tombe au sol
+      body.setVelocity(0, 0);
+      body.setAllowGravity(true);
+      body.setEnable(true);
+      // Réduire la hitbox pour ne pas interférer avec les joueurs vivants
+      this.sprite.setAlpha(0.5);
+      this.sprite.setTint(0x666666);
     }
   }
 
@@ -230,6 +230,7 @@ export class Player {
     this.sprite.setPosition(x, y);
     this.sprite.setAlpha(1);
     this.sprite.setScale(1);
+    this.sprite.clearTint();
     this.nameText.setVisible(true);
     this.arrowText.setVisible(true);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
