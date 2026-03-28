@@ -328,7 +328,10 @@ export class GameScene extends Phaser.Scene {
           // Une flèche ne peut tuer son tireur qu'après avoir quitté sa hitbox
           if (arrow.ownerId === playerId && !arrow.canHitOwner) continue;
 
-          if (arrow.armed && this.tipHitsSprite(tip, player.sprite)) {
+          // Les flèches peuvent toucher les autres joueurs immédiatement,
+          // mais ne peuvent toucher leur tireur qu'après le délai d'armement
+          const isOwner = arrow.ownerId === playerId;
+          if ((!isOwner || arrow.armed) && this.tipHitsSprite(tip, player.sprite)) {
             if (playerId === localId && arrow.ownerId === localId) {
               // Le joueur local se tue avec sa propre flèche retombante
               this.network.sendPlayerHit(localId, 'arrow');
