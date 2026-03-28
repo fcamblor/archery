@@ -84,16 +84,7 @@ function checkRoundOver(code: string) {
     const winner = room.players.find(p => p.id === winnerId);
     winnerName = winner?.name || 'Inconnu';
 
-    // Incrémenter le score du gagnant
     const scores = scoresInRoom.get(code) || {};
-    scores[winnerId] = (scores[winnerId] || 0) + 1;
-    scoresInRoom.set(code, scores);
-
-    // Vérifier si le joueur a atteint le score de victoire
-    if (scores[winnerId] >= SCORE_TO_WIN) {
-      io.to(code).emit('game-over', winnerId, winnerName, scores);
-      return;
-    }
 
     io.to(code).emit('round-over', winnerId, winnerName, scores);
 
@@ -222,11 +213,28 @@ io.on('connection', (socket) => {
       alive.delete(victimId);
     }
 
-    // Auto-kill : le tireur perd un point (min 0)
-    if (victimId === socket.id) {
-      const scores = scoresInRoom.get(code);
-      if (scores && scores[victimId] > 0) {
-        scores[victimId]--;
+    const scores = scoresInRoom.get(code);
+    if (scores) {
+      if (victimId === socket.id) {
+        // Auto-kill : le tireur perd un point (min 0)
+        if (scores[victimId] > 0) {
+          scores[victimId]--;
+        }
+      } else {
+        // Kill normal : +1 au tueur
+        scores[socket.id] = (scores[socket.id] || 0) + 1;
+      }
+
+      // Vérifier si le tueur a atteint le score de victoire
+      const killerId = socket.id;
+      const killerScore = scores[killerId] || 0;
+      if (killerScore >= SCORE_TO_WIN) {
+        const room = rooms.get(code);
+        const killer = room?.players.find(p => p.id === killerId);
+        const killerName = killer?.name || 'Inconnu';
+        io.to(code).emit('player-died', victimId, socket.id, method);
+        io.to(code).emit('game-over', killerId, killerName, scores);
+        return;
       }
     }
 

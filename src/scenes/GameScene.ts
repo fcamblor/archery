@@ -17,12 +17,13 @@ export class GameScene extends Phaser.Scene {
   private arrowHud!: Phaser.GameObjects.Text;
   private fpsText!: Phaser.GameObjects.Text;
   private roundOverText?: Phaser.GameObjects.Text;
-  private scoreTexts: Phaser.GameObjects.Text[] = [];
+  private scoreTexts: Phaser.GameObjects.GameObject[] = [];
   private network!: NetworkManager;
   private lastSyncTime = 0;
   private lastArrowCount = -1;
   private roundEnded = false;
   private scores: ScoreBoard = {};
+  private previousScores: ScoreBoard = {};
   private touchControls: TouchControls | null = null;
 
   // Données reçues du lobby
@@ -180,6 +181,7 @@ export class GameScene extends Phaser.Scene {
     // Fin de round (un joueur a gagné ce round, mais la partie continue)
     this.network.onRoundOver((winnerId, winnerName, scores) => {
       this.roundEnded = true;
+      this.previousScores = { ...this.scores };
       this.scores = scores;
       const isMe = winnerId === this.network.playerId;
       const msg = winnerId === ''
@@ -212,6 +214,7 @@ export class GameScene extends Phaser.Scene {
     // Fin de partie (un joueur a atteint 5 points)
     this.network.onGameOver((winnerId, winnerName, scores) => {
       this.roundEnded = true;
+      this.previousScores = { ...this.scores };
       this.scores = scores;
       const isMe = winnerId === this.network.playerId;
       const msg = isMe ? 'VICTOIRE FINALE !' : `${winnerName} remporte la partie !`;
@@ -509,25 +512,93 @@ export class GameScene extends Phaser.Scene {
     if (!room) return;
 
     const startY = this.scale.height / 2 + 10;
+    const rowHeight = 22;
+    const skullChar = '💀';
+    const skullSize = 14;
+    const nameWidth = 70;
+    const centerX = this.scale.width / 2;
+
     const sorted = room.players
-      .map(p => ({ ...p, score: scores[p.id] || 0 }))
+      .map(p => ({ ...p, score: scores[p.id] || 0, prevScore: this.previousScores[p.id] || 0 }))
       .sort((a, b) => b.score - a.score);
+
+    // Fond semi-transparent pour le tableau
+    const bgHeight = sorted.length * rowHeight + 12;
+    const bgWidth = nameWidth + 10 * skullSize + 20;
+    const bg = this.add.rectangle(
+      centerX, startY + (sorted.length * rowHeight) / 2 - 4,
+      bgWidth, bgHeight,
+      0x000000, 0.7,
+    ).setDepth(200);
+    this.scoreTexts.push(bg);
 
     for (let i = 0; i < sorted.length; i++) {
       const p = sorted[i];
       const color = `#${p.color.toString(16).padStart(6, '0')}`;
-      const text = this.add.text(
-        this.scale.width / 2, startY + i * 18,
-        `${p.name}: ${p.score} pt${p.score > 1 ? 's' : ''}`,
-        {
+      const y = startY + i * rowHeight;
+      const rowLeft = centerX - bgWidth / 2 + 8;
+
+      // Nom du joueur
+      const nameText = this.add.text(rowLeft, y, p.name, {
+        fontSize: '11px',
+        color,
+        fontFamily: 'monospace',
+        fontStyle: 'bold',
+      }).setOrigin(0, 0.5).setDepth(201);
+      this.scoreTexts.push(nameText);
+
+      const skullStartX = rowLeft + nameWidth;
+      const prevCount = p.prevScore;
+      const newCount = p.score;
+      const delta = newCount - prevCount;
+
+      // Crânes déjà acquis (affichés immédiatement)
+      const stableCount = delta >= 0 ? prevCount : newCount;
+      for (let s = 0; s < stableCount; s++) {
+        const skull = this.add.text(skullStartX + s * skullSize, y, skullChar, {
           fontSize: '12px',
-          color,
-          fontFamily: 'monospace',
-          backgroundColor: '#000000aa',
-          padding: { x: 8, y: 2 },
-        },
-      ).setOrigin(0.5).setDepth(200);
-      this.scoreTexts.push(text);
+        }).setOrigin(0, 0.5).setDepth(201);
+        this.scoreTexts.push(skull);
+      }
+
+      if (delta > 0) {
+        // Nouveaux kills : animer les crânes un par un
+        for (let d = 0; d < delta; d++) {
+          const sx = skullStartX + (prevCount + d) * skullSize;
+          const skull = this.add.text(sx, y, skullChar, {
+            fontSize: '12px',
+          }).setOrigin(0, 0.5).setDepth(201).setScale(0).setAlpha(0);
+          this.scoreTexts.push(skull);
+
+          this.tweens.add({
+            targets: skull,
+            scaleX: 1,
+            scaleY: 1,
+            alpha: 1,
+            duration: 300,
+            delay: 700 + d * 200,
+            ease: 'Back.easeOut',
+          });
+        }
+      } else if (delta < 0) {
+        // Auto-kill : griser les crânes perdus
+        for (let d = 0; d < Math.abs(delta); d++) {
+          const sx = skullStartX + (newCount + d) * skullSize;
+
+          const skull = this.add.text(sx, y, skullChar, {
+            fontSize: '12px',
+          }).setOrigin(0, 0.5).setDepth(201);
+          this.scoreTexts.push(skull);
+
+          this.tweens.add({
+            targets: skull,
+            alpha: 0.3,
+            duration: 400,
+            delay: 700 + d * 200,
+            ease: 'Sine.easeOut',
+          });
+        }
+      }
     }
   }
 
