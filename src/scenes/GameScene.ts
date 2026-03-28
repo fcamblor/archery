@@ -93,6 +93,7 @@ export class GameScene extends Phaser.Scene {
         this.localPlayer = player;
       }
     }
+
   }
 
   private setupLocalPlayerShooting() {
@@ -252,8 +253,11 @@ export class GameScene extends Phaser.Scene {
     // Update et collisions des flèches
     this.updateArrows();
 
-    // Stomp entre joueurs (le local détecte les stomps qu'il inflige)
+    // Stomp entre joueurs (le local détecte les stomps qu'il inflige) — avant la résolution de collision
     this.checkStomps();
+
+    // Collision physique entre joueurs (résolution manuelle car les remote sont téléportés)
+    this.resolvePlayerCollisions();
 
     // HUD
     this.updateHUD();
@@ -299,6 +303,46 @@ export class GameScene extends Phaser.Scene {
             arrow.destroy();
             this.arrows.splice(i, 1);
           }
+        }
+      }
+    }
+  }
+
+  private resolvePlayerCollisions() {
+    if (!this.localPlayer?.alive) return;
+
+    const localSprite = this.localPlayer.sprite;
+    const localBody = localSprite.body as Phaser.Physics.Arcade.Body;
+    const localId = this.network.playerId;
+
+    for (const [playerId, player] of this.players) {
+      if (playerId === localId || !player.alive) continue;
+
+      const otherSprite = player.sprite;
+      const localBounds = localSprite.getBounds();
+      const otherBounds = otherSprite.getBounds();
+
+      if (!Phaser.Geom.Intersects.RectangleToRectangle(localBounds, otherBounds)) continue;
+
+      // Calculer la pénétration sur chaque axe
+      const overlapX = Math.min(localBounds.right - otherBounds.left, otherBounds.right - localBounds.left);
+      const overlapY = Math.min(localBounds.bottom - otherBounds.top, otherBounds.bottom - localBounds.top);
+
+      // Pousser le joueur local hors de l'overlap sur l'axe de moindre pénétration
+      if (overlapX < overlapY) {
+        const pushDir = localSprite.x < otherSprite.x ? -1 : 1;
+        localSprite.x += pushDir * overlapX;
+        localBody.setVelocityX(0);
+      } else {
+        const pushDir = localSprite.y < otherSprite.y ? -1 : 1;
+        localSprite.y += pushDir * overlapY;
+        if (pushDir === -1) {
+          // Poussé vers le haut = on est "posé" sur l'autre joueur
+          localBody.setVelocityY(0);
+          localBody.blocked.down = true;
+        } else {
+          // Poussé vers le bas = on cogne la tête
+          localBody.setVelocityY(0);
         }
       }
     }
