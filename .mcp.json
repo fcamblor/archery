@@ -5,7 +5,8 @@
       "args": [
         "chrome-devtools-mcp@latest",
         "--autoConnect",
-        "--channel=stable"
+        "--channel=stable",
+        "--protocolTimeout=60000"
       ]
     }
   }

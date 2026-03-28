@@ -13,7 +13,27 @@ export class GameScene extends Phaser.Scene {
   private mobs: Mob[] = [];
   private arrowHud!: Phaser.GameObjects.Text;
   private fpsText!: Phaser.GameObjects.Text;
+  private debugText!: Phaser.GameObjects.Text;
   private playerDead = false;
+
+  // Perf instrumentation
+  private perfTimings = {
+    playerUpdate: 0,
+    mobsUpdate: 0,
+    arrowsUpdate: 0,
+    hudUpdate: 0,
+    totalUpdate: 0,
+    getBoundsCount: 0,
+    colliderCount: 0,
+    gameObjectCount: 0,
+  };
+  private perfAccum: typeof GameScene.prototype.perfTimings = {
+    playerUpdate: 0, mobsUpdate: 0, arrowsUpdate: 0, hudUpdate: 0,
+    totalUpdate: 0, getBoundsCount: 0, colliderCount: 0, gameObjectCount: 0,
+  };
+  private perfFrameCount = 0;
+  private lastPerfDisplay = 0;
+  private lastArrowCount = -1;
 
   constructor() {
     super('GameScene');
@@ -55,6 +75,15 @@ export class GameScene extends Phaser.Scene {
     });
     this.fpsText.setScrollFactor(0);
     this.fpsText.setDepth(100);
+
+    // Panneau de debug perf
+    this.debugText = this.add.text(8, 36, '', {
+      fontSize: '9px',
+      color: '#66cc66',
+      fontFamily: 'monospace',
+    });
+    this.debugText.setScrollFactor(0);
+    this.debugText.setDepth(100);
   }
 
   private buildLevel() {
@@ -101,32 +130,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
+    const t0 = performance.now();
     if (this.playerDead) return;
 
-    this.player.update(delta);
+    this.perfTimings.getBoundsCount = 0;
 
-    // Mise à jour des mobs + collision mob → joueur
+    // --- Player update ---
+    const tPlayer0 = performance.now();
+    this.player.update(delta);
+    this.perfTimings.playerUpdate = performance.now() - tPlayer0;
+
+    // --- Mobs update + collision mob → joueur ---
+    const tMobs0 = performance.now();
     const playerBody = this.player.sprite.body as Phaser.Physics.Arcade.Body;
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const mob = this.mobs[i];
       mob.update();
       if (mob.alive && this.checkOverlap(mob.sprite, this.player.sprite)) {
         if (this.isStomping(this.player.sprite, mob.sprite)) {
-          // Stomp : le joueur atterrit sur la tête du mob
           mob.die(true);
           this.mobs.splice(i, 1);
-          // Rebond du joueur après le stomp
           playerBody.setVelocityY(-200);
           this.stompEffect(mob.sprite.x, mob.sprite.y);
         } else {
-          // Contact normal : le mob tue le joueur
           this.killPlayer();
           return;
         }
       }
     }
+    this.perfTimings.mobsUpdate = performance.now() - tMobs0;
 
-    // Mise à jour des flèches + collisions
+    // --- Arrows update + collisions ---
+    const tArrows0 = performance.now();
     for (let i = this.arrows.length - 1; i >= 0; i--) {
       const arrow = this.arrows[i];
       arrow.update();
@@ -134,7 +169,6 @@ export class GameScene extends Phaser.Scene {
       if (!arrow.stuck) {
         const tip = arrow.getTipPosition();
 
-        // Collision pointe de flèche → mobs
         for (let j = this.mobs.length - 1; j >= 0; j--) {
           const mob = this.mobs[j];
           if (mob.alive && this.tipHitsSprite(tip, mob.sprite)) {
@@ -144,14 +178,12 @@ export class GameScene extends Phaser.Scene {
           }
         }
 
-        // Collision pointe de flèche → joueur (ignore les flèches tirées par le joueur)
         if (!arrow.stuck && arrow.armed && arrow.spawner !== this.player.sprite
             && this.tipHitsSprite(tip, this.player.sprite)) {
           this.killPlayer();
         }
       }
 
-      // Ramasser les flèches plantées (uniquement stuck)
       if (arrow.stuck && this.checkOverlap(this.player.sprite, arrow.sprite)) {
         if (this.player.addArrow()) {
           arrow.destroy();
@@ -159,10 +191,54 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+    this.perfTimings.arrowsUpdate = performance.now() - tArrows0;
 
-    // Mise à jour du HUD
-    this.arrowHud.setText('▲ '.repeat(this.player.arrowCount).trim());
+    // --- HUD update ---
+    const tHud0 = performance.now();
+    // Arrow HUD : dirty flag
+    if (this.player.arrowCount !== this.lastArrowCount) {
+      this.arrowHud.setText('▲ '.repeat(this.player.arrowCount).trim());
+      this.lastArrowCount = this.player.arrowCount;
+    }
+    // FPS + debug : update toutes les 500ms seulement
+    const now = _time;
     this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | arrows: ${this.arrows.length} | mobs: ${this.mobs.length}`);
+    this.perfTimings.hudUpdate = performance.now() - tHud0;
+
+    this.perfTimings.totalUpdate = performance.now() - t0;
+
+    // Compteurs de santé
+    this.perfTimings.colliderCount = (this.physics.world as any)._colliders?.length
+      ?? (this.physics.world.colliders as any)?.getActive?.()?.length ?? -1;
+    this.perfTimings.gameObjectCount = this.children.length;
+
+    // Accumulation pour affichage moyenné
+    for (const key of Object.keys(this.perfTimings) as (keyof typeof this.perfTimings)[]) {
+      this.perfAccum[key] += this.perfTimings[key];
+    }
+    this.perfFrameCount++;
+
+    // Affichage debug toutes les 500ms
+    if (now - this.lastPerfDisplay >= 500) {
+      const n = this.perfFrameCount || 1;
+      const avg = (k: keyof typeof this.perfTimings) => (this.perfAccum[k] / n).toFixed(2);
+      this.debugText.setText(
+        `update: ${avg('totalUpdate')}ms\n` +
+        `  player: ${avg('playerUpdate')}ms\n` +
+        `  mobs:   ${avg('mobsUpdate')}ms\n` +
+        `  arrows: ${avg('arrowsUpdate')}ms\n` +
+        `  hud:    ${avg('hudUpdate')}ms\n` +
+        `getBounds: ${avg('getBoundsCount')}/frame\n` +
+        `colliders: ${Math.round(this.perfAccum.colliderCount / n)}\n` +
+        `objects:   ${Math.round(this.perfAccum.gameObjectCount / n)}`
+      );
+      this.lastPerfDisplay = now;
+      // Reset accum
+      for (const key of Object.keys(this.perfAccum) as (keyof typeof this.perfAccum)[]) {
+        this.perfAccum[key] = 0;
+      }
+      this.perfFrameCount = 0;
+    }
   }
 
   private killPlayer() {
@@ -211,11 +287,11 @@ export class GameScene extends Phaser.Scene {
     const stomperBody = stomper.body as Phaser.Physics.Arcade.Body;
     if (stomperBody.velocity.y <= 0) return false;
 
+    this.perfTimings.getBoundsCount += 2;
     const stomperBounds = stomper.getBounds();
     const targetBounds = target.getBounds();
     const targetMidY = targetBounds.y + targetBounds.height / 2;
 
-    // Le bas du stomper doit être dans la moitié haute de la cible
     return stomperBounds.bottom >= targetBounds.y && stomperBounds.bottom <= targetMidY;
   }
 
@@ -248,6 +324,7 @@ export class GameScene extends Phaser.Scene {
     tip: { x: number; y: number },
     target: Phaser.Physics.Arcade.Sprite,
   ): boolean {
+    this.perfTimings.getBoundsCount++;
     const bounds = target.getBounds();
     return bounds.contains(tip.x, tip.y);
   }
@@ -256,6 +333,7 @@ export class GameScene extends Phaser.Scene {
     a: Phaser.Physics.Arcade.Sprite,
     b: Phaser.Physics.Arcade.Sprite,
   ): boolean {
+    this.perfTimings.getBoundsCount += 2;
     const boundsA = a.getBounds();
     const boundsB = b.getBounds();
     return Phaser.Geom.Intersects.RectangleToRectangle(boundsA, boundsB);
