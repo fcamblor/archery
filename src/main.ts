@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TitleScene } from './scenes/TitleScene';
 import { LobbyScene } from './scenes/LobbyScene';
 import { GameScene } from './scenes/GameScene';
+import { TrainingScene } from './scenes/TrainingScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     activePointers: 3,
   },
-  scene: [TitleScene, LobbyScene, GameScene],
+  scene: [TitleScene, LobbyScene, GameScene, TrainingScene],
 };
 
 new Phaser.Game(config);

@@ -32,6 +32,11 @@ export class TitleScene extends Phaser.Scene {
     this.createButton(width / 2, height * 0.70, 'REJOINDRE', () => {
       this.scene.start('LobbyScene', { mode: 'join' });
     });
+
+    // Bouton Entraînement
+    this.createButton(width / 2, height * 0.85, "S'ENTRAÎNER", () => {
+      this.scene.start('TrainingScene');
+    });
   }
 
   private createButton(x: number, y: number, label: string, onClick: () => void) {

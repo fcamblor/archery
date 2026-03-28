@@ -222,9 +222,9 @@ export class Player {
     }
   }
 
-  respawn(x: number, y: number) {
+  respawn(x: number, y: number, keepArrows = false) {
     this.alive = true;
-    this.arrowCount = INITIAL_ARROWS;
+    if (!keepArrows) this.arrowCount = INITIAL_ARROWS;
     this.sprite.setPosition(x, y);
     this.sprite.setAlpha(1);
     this.sprite.setScale(1);
