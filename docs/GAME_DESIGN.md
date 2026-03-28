@@ -13,10 +13,12 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 
 ## Contrôles
 
-- **A / D** : déplacement gauche/droite
-- **W / S** : visée haut/bas (8 directions avec combinaisons)
+- **A / D** (position physique QWERTY) : déplacement gauche/droite
+- **W / S** (position physique QWERTY) : visée haut/bas (8 directions avec combinaisons)
 - **K** : saut / wall jump
 - **O** : tir
+
+Les contrôles sont basés sur la position physique des touches (`event.code`), donc identiques sur clavier AZERTY et QWERTY.
 
 ## Déplacements
 

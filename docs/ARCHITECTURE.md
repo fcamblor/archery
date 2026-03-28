@@ -26,7 +26,7 @@ server/
 - **Client** : Socket.io-client via `NetworkManager` (singleton).
 - **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene → LobbyScene (retour après round).
 - **Rooms** : code à 4 caractères, max 6 joueurs. L'hôte crée la room et lance la partie. Si l'hôte quitte, le rôle est transféré au premier joueur restant.
-- **Nom du joueur** : saisie via input HTML (max 12 caractères) dans le lobby, avant la création/join de room. Le nom est transmis au serveur via les événements `create-room` / `join-room`.
+- **Nom du joueur** : saisie via input HTML (max 12 caractères) dans le lobby, avant la création/join de room. Le nom est transmis au serveur via les événements `create-room` / `join-room`. Le nom est persisté dans `localStorage` pour pré-remplir le champ lors des sessions suivantes.
 - Les types partagés (`src/shared/types.ts`) définissent les événements client↔serveur de manière typée.
 
 ## Modèle de synchronisation réseau (itération 6)
@@ -43,7 +43,7 @@ Le serveur agit principalement comme un relais. Chaque client exécute sa propre
 ### Joueurs locaux vs distants
 
 - **Joueur local** : contrôlé par le clavier, physique Arcade complète. Envoie son état au réseau.
-- **Joueurs distants** : pas de contrôle clavier, position appliquée directement depuis les messages réseau (`applyRemoteState`). Physique arcade active uniquement pour les collisions avec les plateformes.
+- **Joueurs distants** : pas de contrôle clavier, position appliquée directement depuis les messages réseau (`applyRemoteState` via `body.reset()`). Physique arcade active uniquement pour les collisions avec les plateformes.
 
 ### Points de spawn
 
@@ -59,7 +59,7 @@ Le serveur attribue un point de spawn fixe à chaque joueur au lancement (6 posi
 - Entité `Arrow` (`src/entities/Arrow.ts`) : sprite avec physique arcade, rotation alignée sur la vélocité.
 - Chaque flèche possède un `arrowId` unique (pour la synchronisation réseau) et un `ownerId` (identifiant du tireur).
 - Body physique carré (4x4) indépendant du sprite visuel (10x3) pour une collision précise quelle que soit la rotation.
-- Visée 8 directions via W/S (haut/bas) combiné avec A/D (gauche/droite) au moment du tir (O). Sans direction, tir dans la direction du regard. Le saut est assigné à la touche K (séparé de la visée vers le haut).
+- Visée 8 directions via W/S (haut/bas) combiné avec A/D (gauche/droite) au moment du tir (O). Sans direction, tir dans la direction du regard. Le saut est assigné à la touche K (séparé de la visée vers le haut). Les contrôles utilisent `event.code` (position physique des touches) pour être indépendants du layout clavier (AZERTY/QWERTY).
 - Trajectoire : départ horizontal (gravité désactivée pendant 120ms), puis courbe parabolique. Vitesse plafonnée à `ARROW_SPEED` (500 px/s) via `setMaxSpeed` pour éviter le tunneling à travers les plateformes.
 - **Collision par la pointe** : seule la pointe de la flèche (extrémité avant dans la direction de vol, calculée par `getTipPosition()`) peut tuer. La détection utilise un test point-dans-rectangle (`tipHitsSprite`) au lieu d'un overlap de body complet.
 - **Protection du tireur** : une flèche en vol ne peut pas tuer son propre tireur (vérifié via `ownerId`).
@@ -91,9 +91,16 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 - Animation de mort : expansion + fade out (flèche) ou écrasement (stomp).
 - Pas de respawn dans un round — le joueur reste mort jusqu'à la fin du round.
 
+## Collision entre joueurs
+
+- Les colliders Arcade ne fonctionnent pas avec les joueurs distants (téléportation via `body.reset()` bypass la détection physique).
+- La collision est résolue manuellement à chaque frame dans `GameScene.resolvePlayerCollisions()` : calcul de l'overlap entre le joueur local et chaque joueur distant, puis poussée sur l'axe de moindre pénétration.
+- Si le joueur est repoussé vers le haut (posé sur un autre joueur), `body.blocked.down` est activé pour permettre le saut.
+
 ## Stomp (piétinement)
 
 - Un joueur qui tombe (vélocité Y > 0) sur la moitié haute d'un autre joueur le tue par piétinement.
+- Le stomp est vérifié **avant** la résolution de collision pour que l'overlap soit encore présent.
 - Après un stomp, le joueur rebondit vers le haut (impulsion de -200).
 - Animation de stomp spécifique : écrasement horizontal du joueur (scaleX 1.8, scaleY 0.2) + particules jaunes autour du point d'impact.
 - La détection se base sur la position du bas du joueur par rapport au centre vertical de la cible.
