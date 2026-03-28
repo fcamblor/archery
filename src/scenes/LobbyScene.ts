@@ -143,6 +143,7 @@ export class LobbyScene extends Phaser.Scene {
       placeholder: 'Votre nom',
       width: 140,
     });
+    nameInput.value = localStorage.getItem('towerfall_playerName') ?? '';
     nameInput.focus();
     this.nameInputElement = nameInput;
 
@@ -165,7 +166,9 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private getPlayerName(): string {
-    return this.nameInputElement?.value.trim() || 'Joueur';
+    const name = this.nameInputElement?.value.trim() || 'Joueur';
+    localStorage.setItem('towerfall_playerName', name);
+    return name;
   }
 
   private async hostRoom() {
@@ -188,6 +191,7 @@ export class LobbyScene extends Phaser.Scene {
       placeholder: 'Votre nom',
       width: 140,
     });
+    nameInput.value = localStorage.getItem('towerfall_playerName') ?? '';
     nameInput.focus();
     this.nameInputElement = nameInput;
 
