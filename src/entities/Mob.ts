@@ -6,6 +6,7 @@ const MOB_SPEED = 40;
 export class Mob {
   public sprite: Phaser.Physics.Arcade.Sprite;
   public alive = true;
+  public harmless = false;
   private scene: Phaser.Scene;
   private direction = 1; // 1 = droite, -1 = gauche
 
@@ -35,6 +36,18 @@ export class Mob {
 
     // Direction initiale aléatoire
     this.direction = Math.random() < 0.5 ? -1 : 1;
+  }
+
+  /** Rend le mob inoffensif pendant `duration` ms avec un rendu plus opaque/transparent */
+  setHarmless(duration: number) {
+    this.harmless = true;
+    this.sprite.setAlpha(0.4);
+
+    this.scene.time.delayedCall(duration, () => {
+      if (!this.alive) return;
+      this.harmless = false;
+      this.sprite.setAlpha(1);
+    });
   }
 
   update() {

@@ -10,6 +10,7 @@ const MOB_COUNT = 5;
 const MOB_RESPAWN_DELAY = 3000; // ms avant respawn d'un mob tué
 const PLAYER_RESPAWN_DELAY = 2000; // ms avant respawn du joueur
 const PLAYER_INVINCIBLE_DURATION = 2000; // ms d'invincibilité après respawn
+const MOB_HARMLESS_DURATION = 1500; // ms d'inoffensivité après spawn d'un mob
 
 // Points de spawn pour les mobs (sur les plateformes)
 const MOB_SPAWN_POINTS = [
@@ -119,6 +120,7 @@ export class TrainingScene extends Phaser.Scene {
 
   private spawnMob(point: { x: number; y: number }) {
     const mob = new Mob(this, point.x, point.y);
+    mob.setHarmless(MOB_HARMLESS_DURATION);
     this.physics.add.collider(mob.sprite, this.platforms);
     this.mobs.push(mob);
   }
@@ -297,8 +299,8 @@ export class TrainingScene extends Phaser.Scene {
           this.stompEffect(mob.sprite.x, mob.sprite.y);
           this.score++;
           this.scheduleRespawnMob();
-        } else if (!this.localPlayer.invincible) {
-          // Contact sans stomp : le mob tue le joueur (sauf si invincible)
+        } else if (!this.localPlayer.invincible && !mob.harmless) {
+          // Contact sans stomp : le mob tue le joueur (sauf si invincible ou mob inoffensif)
           this.localPlayer.die();
           this.scheduleRespawnPlayer();
           return; // Le joueur est mort, pas besoin de continuer
