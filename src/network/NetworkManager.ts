@@ -1,8 +1,10 @@
 import { io, Socket } from 'socket.io-client';
 import type { ClientEvents, ServerEvents, RoomInfo, PlayerInfo, PlayerState, ArrowData, ScoreBoard } from '../shared/types';
 
-// Le serveur Socket.io tourne sur le même hôte que la page, port 3001
-const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
+// En dev, le serveur Socket.io tourne sur le port 3001 ; en prod, même origine
+const SERVER_URL = import.meta.env.DEV
+  ? `${window.location.protocol}//${window.location.hostname}:3001`
+  : window.location.origin;
 
 type TypedSocket = Socket<ServerEvents, ClientEvents>;
 
