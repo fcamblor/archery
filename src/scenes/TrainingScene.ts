@@ -9,6 +9,7 @@ const TILE_SIZE = 16;
 const MOB_COUNT = 5;
 const MOB_RESPAWN_DELAY = 3000; // ms avant respawn d'un mob tué
 const PLAYER_RESPAWN_DELAY = 2000; // ms avant respawn du joueur
+const PLAYER_INVINCIBLE_DURATION = 2000; // ms d'invincibilité après respawn
 
 // Points de spawn pour les mobs (sur les plateformes)
 const MOB_SPAWN_POINTS = [
@@ -257,8 +258,8 @@ export class TrainingScene extends Phaser.Scene {
           }
         }
 
-        // Auto-kill : la flèche peut tuer le joueur
-        if (this.localPlayer.alive && arrow.canHitOwner && arrow.armed) {
+        // Auto-kill : la flèche peut tuer le joueur (pas si invincible)
+        if (this.localPlayer.alive && !this.localPlayer.invincible && arrow.canHitOwner && arrow.armed) {
           if (this.tipHitsSprite(tip, this.localPlayer.sprite)) {
             this.localPlayer.die();
             arrow.drop();
@@ -296,8 +297,8 @@ export class TrainingScene extends Phaser.Scene {
           this.stompEffect(mob.sprite.x, mob.sprite.y);
           this.score++;
           this.scheduleRespawnMob();
-        } else {
-          // Contact sans stomp : le mob tue le joueur
+        } else if (!this.localPlayer.invincible) {
+          // Contact sans stomp : le mob tue le joueur (sauf si invincible)
           this.localPlayer.die();
           this.scheduleRespawnPlayer();
           return; // Le joueur est mort, pas besoin de continuer
@@ -318,6 +319,7 @@ export class TrainingScene extends Phaser.Scene {
     this.time.delayedCall(PLAYER_RESPAWN_DELAY, () => {
       const sp = Phaser.Utils.Array.GetRandom(PLAYER_SPAWN_POINTS);
       this.localPlayer.respawn(sp.x, sp.y, true);
+      this.localPlayer.setInvincible(PLAYER_INVINCIBLE_DURATION);
       this.setupShooting();
     });
   }

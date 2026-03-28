@@ -25,6 +25,7 @@ export class Player {
   public playerName: string;
   public isRemote: boolean;
   public alive = true;
+  public invincible = false;
   public facing: 'left' | 'right' = 'right';
 
   // Contrôles basés sur event.code (position physique, indépendant AZERTY/QWERTY)
@@ -34,6 +35,7 @@ export class Player {
   private virtualInput: VirtualInputState | null = null;
   private virtualJumpConsumed = false;
   private virtualShootConsumed = false;
+  private invincibleTween: Phaser.Tweens.Tween | null = null;
   private isClinging = false;
   private clingDirection: 'left' | 'right' | null = null;
   private wallJumpCooldown = 0;
@@ -224,6 +226,7 @@ export class Player {
 
   respawn(x: number, y: number, keepArrows = false) {
     this.alive = true;
+    this.clearInvincible();
     if (!keepArrows) this.arrowCount = INITIAL_ARROWS;
     this.sprite.setPosition(x, y);
     this.sprite.setAlpha(1);
@@ -235,6 +238,35 @@ export class Player {
     body.setEnable(true);
     body.setAllowGravity(true);
     body.setVelocity(0, 0);
+  }
+
+  /** Rend le joueur invincible pendant `duration` ms avec un effet visuel de clignotement */
+  setInvincible(duration: number) {
+    this.invincible = true;
+    this.sprite.setTint(0x00ffff);
+
+    // Clignotement : alterner entre teinte cyan et couleur normale
+    this.invincibleTween = this.scene.tweens.add({
+      targets: this.sprite,
+      alpha: { from: 1, to: 0.3 },
+      duration: 150,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.scene.time.delayedCall(duration, () => {
+      this.clearInvincible();
+    });
+  }
+
+  private clearInvincible() {
+    this.invincible = false;
+    if (this.invincibleTween) {
+      this.invincibleTween.stop();
+      this.invincibleTween = null;
+    }
+    this.sprite.setAlpha(1);
+    this.sprite.clearTint();
   }
 
   /** Vérifie si une touche physique est enfoncée (via event.code) */
