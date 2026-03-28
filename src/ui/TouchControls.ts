@@ -17,6 +17,7 @@ export interface VirtualInputState {
   down: boolean;
   jump: boolean;
   shoot: boolean;
+  menu: boolean;
 }
 
 /**
@@ -28,7 +29,7 @@ export class TouchControls extends Phaser.Scene {
   // État virtuel lu par le Player
   public state: VirtualInputState = {
     left: false, right: false, up: false, down: false,
-    jump: false, shoot: false,
+    jump: false, shoot: false, menu: false,
   };
 
   // Joystick
@@ -40,14 +41,17 @@ export class TouchControls extends Phaser.Scene {
   // Boutons
   private jumpBtn!: Phaser.GameObjects.Arc;
   private shootBtn!: Phaser.GameObjects.Arc;
+  private menuBtn!: Phaser.GameObjects.Arc;
   private jumpLabel!: Phaser.GameObjects.Text;
   private shootLabel!: Phaser.GameObjects.Text;
+  private menuLabel!: Phaser.GameObjects.Text;
   private jumpPointerId: number | null = null;
   private shootPointerId: number | null = null;
 
   // Flags "just pressed" pour saut et tir (consommés par le Player)
   private _jumpJustPressed = false;
   private _shootJustPressed = false;
+  private _menuJustPressed = false;
 
   constructor() {
     super({ key: 'TouchControlsScene', active: false });
@@ -83,6 +87,16 @@ export class TouchControls extends Phaser.Scene {
       fontSize: '9px', color: '#ffffff', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(UI_DEPTH + 1).setAlpha(UI_ALPHA_ACTIVE);
 
+    // --- Bouton menu (coin haut-gauche) ---
+    const menuRadius = 18;
+    const mx = menuRadius + BUTTON_MARGIN;
+    const my = menuRadius + BUTTON_MARGIN;
+    this.menuBtn = this.add.circle(mx, my, menuRadius, 0x888888, UI_ALPHA)
+      .setDepth(UI_DEPTH).setStrokeStyle(2, 0x888888, UI_ALPHA_ACTIVE);
+    this.menuLabel = this.add.text(mx, my, '✕', {
+      fontSize: '14px', color: '#ffffff', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(UI_DEPTH + 1).setAlpha(UI_ALPHA_ACTIVE);
+
     // --- Gestion multi-touch ---
     this.input.addPointer(2); // Jusqu'à 3 pointeurs simultanés
 
@@ -115,6 +129,15 @@ export class TouchControls extends Phaser.Scene {
     return false;
   }
 
+  /** Indique si le bouton menu vient d'être pressé (consommé après lecture) */
+  consumeMenuPress(): boolean {
+    if (this._menuJustPressed) {
+      this._menuJustPressed = false;
+      return true;
+    }
+    return false;
+  }
+
   private handlePointerDown(pointer: Phaser.Input.Pointer) {
     const { x, y } = pointer;
 
@@ -126,6 +149,14 @@ export class TouchControls extends Phaser.Scene {
       this.joystickBase.setPosition(x, y);
       this.joystickThumb.setPosition(x, y);
       this.joystickBase.setAlpha(UI_ALPHA_ACTIVE);
+      return;
+    }
+
+    // Bouton menu
+    if (this.hitTest(x, y, this.menuBtn, 18 * 1.5)) {
+      this._menuJustPressed = true;
+      this.state.menu = true;
+      this.menuBtn.setAlpha(UI_ALPHA_ACTIVE);
       return;
     }
 

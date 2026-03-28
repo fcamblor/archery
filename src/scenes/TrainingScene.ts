@@ -135,18 +135,64 @@ export class TrainingScene extends Phaser.Scene {
       fontFamily: 'monospace',
     }).setScrollFactor(0).setDepth(100);
 
-    // Texte "retour" en bas
-    const backText = this.add.text(this.scale.width / 2, this.scale.height - 10, 'ESC = retour', {
-      fontSize: '8px',
-      color: '#666666',
-      fontFamily: 'monospace',
-    }).setOrigin(0.5).setDepth(100);
-
     // Touche Escape pour retourner au titre
     this.input.keyboard!.on('keydown-ESC', () => {
       this.cleanupGame();
       this.scene.start('TitleScene');
     });
+
+    // Hints clavier (desktop uniquement)
+    if (!isTouchDevice()) {
+      this.showKeyboardHints();
+    }
+  }
+
+  private async showKeyboardHints() {
+    const keyLabels = await this.resolveKeyLabels({
+      left: 'KeyA',
+      right: 'KeyD',
+      up: 'KeyW',
+      down: 'KeyS',
+      jump: 'KeyK',
+      shoot: 'KeyO',
+    });
+
+    const hintsLines = [
+      `${keyLabels.left}/${keyLabels.right} = déplacer`,
+      `${keyLabels.jump} = sauter`,
+      `${keyLabels.shoot} = tirer`,
+      `${keyLabels.up}/${keyLabels.down} = viser`,
+      `ESC = retour`,
+    ];
+
+    this.add.text(this.scale.width / 2, this.scale.height - 10, hintsLines.join('   '), {
+      fontSize: '8px',
+      color: '#666666',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(100);
+  }
+
+  private async resolveKeyLabels(codes: Record<string, string>): Promise<Record<string, string>> {
+    const result: Record<string, string> = {};
+    // Fallback : extraire la lettre du code (ex: "KeyA" → "A")
+    for (const [key, code] of Object.entries(codes)) {
+      result[key] = code.replace('Key', '');
+    }
+    // Tenter d'utiliser l'API Keyboard Layout Map pour les labels réels
+    try {
+      if ('keyboard' in navigator && 'getLayoutMap' in (navigator as any).keyboard) {
+        const layoutMap = await (navigator as any).keyboard.getLayoutMap();
+        for (const [key, code] of Object.entries(codes)) {
+          const label = layoutMap.get(code);
+          if (label) {
+            result[key] = label.toUpperCase();
+          }
+        }
+      }
+    } catch {
+      // L'API n'est pas disponible, on garde le fallback
+    }
+    return result;
   }
 
   private setupTouchControls() {
@@ -164,6 +210,13 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
+    // Bouton menu tactile → retour au titre
+    if (this.touchControls?.consumeMenuPress()) {
+      this.cleanupGame();
+      this.scene.start('TitleScene');
+      return;
+    }
+
     // Update joueur
     this.localPlayer.update(delta);
 
