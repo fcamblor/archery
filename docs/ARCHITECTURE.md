@@ -67,7 +67,7 @@ Le serveur attribue un point de spawn fixe à chaque joueur au lancement (6 posi
 - Les flèches traversent les joueurs tués (la flèche continue).
 - Les flèches plantées sont ramassables par n'importe quel joueur (overlap détecté dans `GameScene.update`).
 - Délai d'armement de 100ms après le tir.
-- Stock initial : 4 flèches, max : 8. Compteur affiché en HUD (texte en haut à gauche).
+- Stock initial : 4 flèches, max : 8. Compteur affiché au-dessus de chaque joueur (▲ par flèche, X quand le stock est vide).
 - Wrap-around identique au joueur sur les 4 bords.
 
 ## Niveaux
@@ -79,7 +79,7 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 
 ## Joueurs
 
-- Entité `Player` (`src/entities/Player.ts`) : sprite avec physique arcade, couleur configurable, nom affiché au-dessus.
+- Entité `Player` (`src/entities/Player.ts`) : sprite avec physique arcade, couleur configurable, nom et compteur de flèches affichés au-dessus.
 - Mode local (contrôle clavier) ou remote (état réseau).
 - Méthodes `die(stomped?)` et `respawn(x, y)` pour la gestion de la mort/résurrection.
 - Chaque joueur a un `playerId` correspondant à son socket ID.

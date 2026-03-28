@@ -40,6 +40,7 @@ export class Player {
   private onShoot?: (x: number, y: number, dir: AimDirection) => void;
   public color: number;
   private nameText: Phaser.GameObjects.Text;
+  private arrowText: Phaser.GameObjects.Text;
 
   // Compteur de textures pour éviter les collisions de noms
   private static textureIndex = 0;
@@ -69,9 +70,16 @@ export class Player {
     this.sprite.setCollideWorldBounds(false);
 
     // Nom au-dessus du joueur
-    this.nameText = scene.add.text(x, y - 12, this.playerName, {
+    this.nameText = scene.add.text(x, y - 18, this.playerName, {
       fontSize: '7px',
       color: `#${this.color.toString(16).padStart(6, '0')}`,
+      fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    // Compteur de flèches entre le nom et le joueur
+    this.arrowText = scene.add.text(x, y - 10, '', {
+      fontSize: '7px',
+      color: '#f4a261',
       fontFamily: 'monospace',
     }).setOrigin(0.5);
 
@@ -105,9 +113,12 @@ export class Player {
   }
 
   update(_delta: number) {
-    // Mettre à jour le nom au-dessus du sprite
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 12);
+    // Mettre à jour le nom et le compteur de flèches au-dessus du sprite
+    this.nameText.setPosition(this.sprite.x, this.sprite.y - 18);
     this.nameText.setVisible(this.alive);
+    this.arrowText.setPosition(this.sprite.x, this.sprite.y - 10);
+    this.arrowText.setVisible(this.alive);
+    this.arrowText.setText(this.arrowCount > 0 ? '▲'.repeat(this.arrowCount) : 'X');
 
     if (this.isRemote || !this.alive) return;
 
@@ -185,6 +196,7 @@ export class Player {
     if (!this.alive) return;
     this.alive = false;
     this.nameText.setVisible(false);
+    this.arrowText.setVisible(false);
 
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setVelocity(0, 0);
@@ -219,6 +231,7 @@ export class Player {
     this.sprite.setAlpha(1);
     this.sprite.setScale(1);
     this.nameText.setVisible(true);
+    this.arrowText.setVisible(true);
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setEnable(true);
     body.setAllowGravity(true);
@@ -316,5 +329,6 @@ export class Player {
   destroy() {
     this.sprite.destroy();
     this.nameText.destroy();
+    this.arrowText.destroy();
   }
 }

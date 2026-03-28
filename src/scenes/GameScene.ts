@@ -14,13 +14,11 @@ export class GameScene extends Phaser.Scene {
   private players: Map<string, Player> = new Map();
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private arrows: Arrow[] = [];
-  private arrowHud!: Phaser.GameObjects.Text;
   private fpsText!: Phaser.GameObjects.Text;
   private roundOverText?: Phaser.GameObjects.Text;
   private scoreTexts: Phaser.GameObjects.GameObject[] = [];
   private network!: NetworkManager;
   private lastSyncTime = 0;
-  private lastArrowCount = -1;
   private roundEnded = false;
   private scores: ScoreBoard = {};
   private previousScores: ScoreBoard = {};
@@ -42,7 +40,6 @@ export class GameScene extends Phaser.Scene {
     this.players.clear();
     this.arrows = [];
     this.roundEnded = false;
-    this.lastArrowCount = -1;
 
     this.buildLevel();
     this.spawnPlayers();
@@ -268,15 +265,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupHUD() {
-    this.arrowHud = this.add.text(8, 8, '', {
-      fontSize: '12px',
-      color: '#f4a261',
-      fontFamily: 'monospace',
-    });
-    this.arrowHud.setScrollFactor(0);
-    this.arrowHud.setDepth(100);
-
-    this.fpsText = this.add.text(8, 22, '', {
+    this.fpsText = this.add.text(8, 8, '', {
       fontSize: '10px',
       color: '#888888',
       fontFamily: 'monospace',
@@ -436,10 +425,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHUD() {
-    if (this.localPlayer && this.localPlayer.arrowCount !== this.lastArrowCount) {
-      this.arrowHud.setText('▲ '.repeat(this.localPlayer.arrowCount).trim());
-      this.lastArrowCount = this.localPlayer.arrowCount;
-    }
     const myScore = this.scores[this.network.playerId] || 0;
     this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)} | flèches: ${this.arrows.length} | joueurs: ${this.countAlivePlayers()}/${this.players.size} | score: ${myScore}/5`);
   }
@@ -634,7 +619,6 @@ export class GameScene extends Phaser.Scene {
     this.setupLocalPlayerShooting();
 
     this.roundEnded = false;
-    this.lastArrowCount = -1;
   }
 
   private cleanupGame() {

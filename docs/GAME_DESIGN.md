@@ -39,6 +39,7 @@ Les contrôles sont basés sur la position physique des touches (`event.code`), 
 - Le nombre de flèches est **réinitialisé à 4** à chaque nouveau round (respawn)
 - Les flèches plantées peuvent être **ramassées** par n'importe quel joueur en passant dessus
 - Les flèches bénéficient du même wrap-around que les joueurs
+- Le stock de flèches est affiché **au-dessus de chaque joueur** (▲ par flèche, **X** quand le stock est vide)
 
 ## Conditions de mort
 
