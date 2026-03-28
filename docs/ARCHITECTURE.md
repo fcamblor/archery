@@ -5,10 +5,28 @@
 ```
 src/
   main.ts            — Point d'entrée, config Phaser
-  scenes/            — Scènes Phaser (GameScene, etc.)
+  scenes/
+    TitleScene.ts    — Écran titre (Héberger / Rejoindre)
+    LobbyScene.ts    — Lobby (joueurs connectés, code, lancement)
+    GameScene.ts     — Scène de jeu principale
   entities/          — Entités de jeu (Player, Arrow, Mob)
+  network/
+    NetworkManager.ts — Singleton Socket.io (connexion, rooms, événements)
+  shared/
+    types.ts         — Types partagés client/serveur (PlayerInfo, RoomInfo, événements)
   levels/            — Données de niveaux (grilles number[][])
+server/
+  index.ts           — Serveur Node.js + Socket.io (rooms, lobby, lancement)
+  tsconfig.json      — Config TypeScript serveur
 ```
+
+## Architecture réseau
+
+- **Serveur** : Node.js + Socket.io sur le port 3001 (`npm run dev:server`).
+- **Client** : Socket.io-client via `NetworkManager` (singleton).
+- **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene.
+- **Rooms** : code à 4 caractères, max 6 joueurs. L'hôte crée la room et lance la partie. Si l'hôte quitte, le rôle est transféré au premier joueur restant.
+- Les types partagés (`src/shared/types.ts`) définissent les événements client↔serveur de manière typée.
 
 ## Physique
 
