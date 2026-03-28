@@ -35,6 +35,7 @@
 - [x] Lobby : l'hôte crée une partie, les autres rejoignent via code 4 caractères
 - [x] Affichage des joueurs connectés dans le lobby (max 6, couleurs distinctes)
 - [x] Lancement de la partie par l'hôte
+- [x] Choix du nom de joueur (max 12 caractères) avant de créer ou rejoindre une partie
 
 ## Itération 6 — Multijoueur réseau (2-6 joueurs)
 - [ ] Synchronisation des états joueurs via le serveur (positions, actions)

@@ -9,6 +9,7 @@ Jeu d'arène 2D multijoueur inspiré de Towerfall (Nintendo Switch). Chaque joue
 - 2 à 6 joueurs simultanés
 - Multijoueur en réseau : chaque joueur joue depuis son propre appareil (ordinateur ou tablette)
 - Un joueur héberge la partie (serveur hôte), les autres le rejoignent
+- Chaque joueur choisit son nom (max 12 caractères) avant de créer ou rejoindre une partie
 
 ## Contrôles
 

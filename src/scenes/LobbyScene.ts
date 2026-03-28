@@ -15,6 +15,7 @@ export class LobbyScene extends Phaser.Scene {
   private startButton?: Phaser.GameObjects.Text;
   private joinButton?: Phaser.GameObjects.Text;
   private inputElement?: HTMLInputElement;
+  private nameInputElement?: HTMLInputElement;
 
   constructor() {
     super('LobbyScene');
@@ -67,7 +68,7 @@ export class LobbyScene extends Phaser.Scene {
       this.statusText.setText('Connecté !');
 
       if (this.mode === 'host') {
-        await this.hostRoom();
+        this.showNameInput(() => this.hostRoom());
       } else {
         this.showJoinInput();
       }
@@ -77,9 +78,83 @@ export class LobbyScene extends Phaser.Scene {
     }
   }
 
+  private createHtmlInput(opts: {
+    top: number;
+    maxLength: number;
+    placeholder: string;
+    width: number;
+    textTransform?: string;
+    letterSpacing?: string;
+  }): HTMLInputElement {
+    const { width } = this.scale;
+    const canvas = this.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / canvas.width;
+    const scaleY = rect.height / canvas.height;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = opts.maxLength;
+    input.placeholder = opts.placeholder;
+    input.style.cssText = `
+      position: absolute;
+      left: ${rect.left + (width / 2 - opts.width / 2) * scaleX}px;
+      top: ${rect.top + opts.top * scaleY}px;
+      width: ${opts.width * scaleX}px;
+      height: ${30 * scaleY}px;
+      font-family: monospace;
+      font-size: ${14 * scaleY}px;
+      text-align: center;
+      background: #264653;
+      color: #e9c46a;
+      border: 2px solid #e9c46a;
+      outline: none;
+      ${opts.textTransform ? `text-transform: ${opts.textTransform};` : ''}
+      ${opts.letterSpacing ? `letter-spacing: ${opts.letterSpacing};` : ''}
+    `;
+    document.body.appendChild(input);
+    return input;
+  }
+
+  private showNameInput(onConfirm: () => void) {
+    this.statusText.setText('Choisissez votre nom :');
+
+    const nameInput = this.createHtmlInput({
+      top: 65,
+      maxLength: 12,
+      placeholder: 'Votre nom',
+      width: 140,
+    });
+    nameInput.focus();
+    this.nameInputElement = nameInput;
+
+    const { width } = this.scale;
+    this.joinButton = this.createButton(width / 2, 115, 'OK', () => {
+      const name = nameInput.value.trim();
+      if (name.length > 0) {
+        onConfirm();
+      }
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const name = nameInput.value.trim();
+        if (name.length > 0) {
+          onConfirm();
+        }
+      }
+    });
+  }
+
+  private getPlayerName(): string {
+    return this.nameInputElement?.value.trim() || 'Joueur';
+  }
+
   private async hostRoom() {
     try {
-      const room = await this.network.createRoom('Hôte');
+      const playerName = this.getPlayerName();
+      this.removeInput();
+      const room = await this.network.createRoom(playerName);
       this.codeText.setText(`Code: ${room.code}`);
       this.statusText.setText('En attente de joueurs...');
       this.renderPlayerList(room.players);
@@ -91,63 +166,55 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private showJoinInput() {
+    this.statusText.setText('Votre nom et code de la partie :');
+
+    const nameInput = this.createHtmlInput({
+      top: 55,
+      maxLength: 12,
+      placeholder: 'Votre nom',
+      width: 140,
+    });
+    nameInput.focus();
+    this.nameInputElement = nameInput;
+
+    const codeInput = this.createHtmlInput({
+      top: 90,
+      maxLength: 4,
+      placeholder: 'CODE',
+      width: 100,
+      textTransform: 'uppercase',
+      letterSpacing: '4px',
+    });
+    this.inputElement = codeInput;
+
     const { width } = this.scale;
-    this.statusText.setText('Entrez le code de la partie :');
-
-    // Utiliser un vrai input HTML pour la saisie du code
-    const canvas = this.game.canvas;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = rect.width / canvas.width;
-    const scaleY = rect.height / canvas.height;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.maxLength = 4;
-    input.placeholder = 'CODE';
-    input.style.cssText = `
-      position: absolute;
-      left: ${rect.left + (width / 2 - 50) * scaleX}px;
-      top: ${rect.top + 65 * scaleY}px;
-      width: ${100 * scaleX}px;
-      height: ${30 * scaleY}px;
-      font-family: monospace;
-      font-size: ${16 * scaleY}px;
-      text-align: center;
-      text-transform: uppercase;
-      background: #264653;
-      color: #e9c46a;
-      border: 2px solid #e9c46a;
-      outline: none;
-      letter-spacing: 4px;
-    `;
-    document.body.appendChild(input);
-    input.focus();
-    this.inputElement = input;
-
-    // Bouton Rejoindre
-    this.joinButton = this.createButton(width / 2, 120, 'OK', () => {
-      const code = input.value.trim().toUpperCase();
-      if (code.length === 4) {
+    this.joinButton = this.createButton(width / 2, 140, 'REJOINDRE', () => {
+      const code = codeInput.value.trim().toUpperCase();
+      const name = nameInput.value.trim();
+      if (code.length === 4 && name.length > 0) {
         this.joinRoom(code);
       }
     });
 
-    // Aussi sur Entrée
-    input.addEventListener('keydown', (e) => {
+    const onEnter = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
-        const code = input.value.trim().toUpperCase();
-        if (code.length === 4) {
+        const code = codeInput.value.trim().toUpperCase();
+        const name = nameInput.value.trim();
+        if (code.length === 4 && name.length > 0) {
           this.joinRoom(code);
         }
       }
-    });
+    };
+    nameInput.addEventListener('keydown', onEnter);
+    codeInput.addEventListener('keydown', onEnter);
   }
 
   private async joinRoom(code: string) {
     try {
       this.statusText.setText('Connexion à la partie...');
+      const playerName = this.getPlayerName();
       this.removeInput();
-      const room = await this.network.joinRoom(code, 'Joueur');
+      const room = await this.network.joinRoom(code, playerName);
       this.codeText.setText(`Code: ${room.code}`);
       this.statusText.setText('Dans le lobby');
       this.renderPlayerList(room.players);
@@ -238,6 +305,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.inputElement) {
       this.inputElement.remove();
       this.inputElement = undefined;
+    }
+    if (this.nameInputElement) {
+      this.nameInputElement.remove();
+      this.nameInputElement = undefined;
     }
     if (this.joinButton) {
       this.joinButton.destroy();

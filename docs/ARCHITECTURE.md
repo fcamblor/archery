@@ -26,6 +26,7 @@ server/
 - **Client** : Socket.io-client via `NetworkManager` (singleton).
 - **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene.
 - **Rooms** : code à 4 caractères, max 6 joueurs. L'hôte crée la room et lance la partie. Si l'hôte quitte, le rôle est transféré au premier joueur restant.
+- **Nom du joueur** : saisie via input HTML (max 12 caractères) dans le lobby, avant la création/join de room. Le nom est transmis au serveur via les événements `create-room` / `join-room`.
 - Les types partagés (`src/shared/types.ts`) définissent les événements client↔serveur de manière typée.
 
 ## Physique
