@@ -13,6 +13,7 @@ export class LobbyScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private codeText!: Phaser.GameObjects.Text;
   private startButton?: Phaser.GameObjects.Text;
+  private joinButton?: Phaser.GameObjects.Text;
   private inputElement?: HTMLInputElement;
 
   constructor() {
@@ -124,7 +125,7 @@ export class LobbyScene extends Phaser.Scene {
     this.inputElement = input;
 
     // Bouton Rejoindre
-    this.createButton(width / 2, 120, 'OK', () => {
+    this.joinButton = this.createButton(width / 2, 120, 'OK', () => {
       const code = input.value.trim().toUpperCase();
       if (code.length === 4) {
         this.joinRoom(code);
@@ -237,6 +238,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.inputElement) {
       this.inputElement.remove();
       this.inputElement = undefined;
+    }
+    if (this.joinButton) {
+      this.joinButton.destroy();
+      this.joinButton = undefined;
     }
   }
 
