@@ -23,14 +23,14 @@ Si SynoCommunity n'a pas de paquet Node.js pour ton architecture ARM :
 ```bash
 # Installer Entware d'abord (voir https://github.com/Entware/Entware/wiki/Install-on-Synology-NAS)
 opkg update
-opkg install node node-npm
+opkg install node node-npm pnpm
 ```
 
 ### Verifier l'installation
 
 ```bash
 node --version   # v20.x ou superieur
-npm --version
+pnpm --version
 ```
 
 ## 2. Deployer le code
@@ -39,10 +39,10 @@ npm --version
 
 ```bash
 # Builder le frontend
-npm run build
+pnpm build
 
 # Creer une archive de deploiement
-tar czf towerfall-deploy.tar.gz dist/ server/ src/shared/ package.json package-lock.json
+tar czf towerfall-deploy.tar.gz dist/ server/ src/shared/ package.json pnpm-lock.yaml
 ```
 
 ### Sur le NAS (via SSH)
@@ -60,7 +60,7 @@ tar xzf towerfall-deploy.tar.gz
 rm towerfall-deploy.tar.gz
 
 # Installer les dependances
-npm install --omit=dev
+pnpm install --prod
 ```
 
 ## 3. Lancer le serveur
@@ -141,7 +141,7 @@ pkill -f "server/index.ts"
 # Mettre a jour le deploiement
 cd /volume1/apps/towerfall
 tar xzf towerfall-deploy.tar.gz
-npm install --omit=dev
+pnpm install --prod
 pkill -f "server/index.ts"
 ./start.sh &
 ```

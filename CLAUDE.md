@@ -7,7 +7,7 @@ Jeu multijoueur en réseau inspiré de Towerfall, développé avec Phaser 3.
 - **Moteur** : Phaser 3 (arcade physics)
 - **Langage** : TypeScript
 - **Bundler** : Vite
-- **Commandes** : `npm run dev` (dev server), `npm run build` (production)
+- **Commandes** : `pnpm dev` (dev server), `pnpm build` (production)
 
 ## Conventions
 

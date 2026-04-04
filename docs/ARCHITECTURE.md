@@ -22,7 +22,7 @@ server/
 
 ## Architecture réseau
 
-- **Serveur** : Node.js + Socket.io sur le port 3001 (`npm run dev:server`).
+- **Serveur** : Node.js + Socket.io sur le port 3001 (`pnpm dev:server`).
 - **Client** : Socket.io-client via `NetworkManager` (singleton).
 - **Flux** : TitleScene → LobbyScene (connexion + room) → GameScene (rounds successifs) → LobbyScene (retour après game-over à 5 pts).
 - **Rooms** : code à 4 caractères, max 6 joueurs. L'hôte crée la room et lance la partie. Si l'hôte quitte, le rôle est transféré au premier joueur restant.

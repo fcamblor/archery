@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "dev:server": "npx tsx server/index.ts",
+    "dev:server": "tsx server/index.ts",
     "build": "tsc && vite build",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "preview": "vite preview"
