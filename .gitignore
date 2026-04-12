@@ -2,3 +2,9 @@
 node_modules
 dist
 deploy.sh
+
+# Archon runtime artifacts (never commit)
+.archon/*
+!.archon/commands
+!.archon/config.yaml
+!.archon/workflows
