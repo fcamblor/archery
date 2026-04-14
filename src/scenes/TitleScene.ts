@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-
 export class TitleScene extends Phaser.Scene {
   private networkButtons: Phaser.GameObjects.Text[] = [];
 

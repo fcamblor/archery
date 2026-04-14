@@ -234,7 +234,8 @@ export class GameScene extends Phaser.Scene {
       // Retour au lobby après quelques secondes
       this.time.delayedCall(5000, () => {
         this.cleanupGame();
-        this.scene.start('LobbyScene', { mode: this.network.isHost ? 'host' : 'join', returning: true });
+        const mode = this.network.isHost ? 'host' : 'join';
+        this.scene.start('LobbyScene', { mode, returning: true });
       });
     });
 

@@ -27,9 +27,19 @@ export class LobbyScene extends Phaser.Scene {
     this.returning = data.returning ?? false;
   }
 
+  private blurHandler = () => {
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+  };
+
   create() {
     const { width, height } = this.scale;
     this.network = NetworkManager.getInstance();
+
+    // Sur mobile, un tap sur le canvas doit d'abord blur les inputs HTML
+    // pour que Phaser reçoive l'événement pointerdown immédiatement
+    this.game.canvas.addEventListener('touchstart', this.blurHandler);
 
     // Titre
     this.add.text(width / 2, 20, this.mode === 'host' ? 'HÉBERGER' : 'REJOINDRE', {
@@ -54,9 +64,13 @@ export class LobbyScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Bouton retour
-    this.createButton(60, height - 25, '← RETOUR', () => {
+    // Nettoyage des éléments HTML et listeners lors du shutdown de la scène
+    this.events.once('shutdown', () => {
       this.cleanup();
+    });
+
+    // Bouton retour (en haut à gauche)
+    this.createButton(50, 20, '← RETOUR', () => {
       this.scene.start('TitleScene');
     });
 
@@ -258,7 +272,6 @@ export class LobbyScene extends Phaser.Scene {
     });
 
     this.network.onGameStarting((spawnPoints) => {
-      this.cleanup();
       this.scene.start('GameScene', { networked: true, spawnPoints });
     });
   }
@@ -297,7 +310,7 @@ export class LobbyScene extends Phaser.Scene {
 
   private showStartButton() {
     const { width, height } = this.scale;
-    this.startButton = this.createButton(width / 2, height - 25, 'LANCER LA PARTIE', () => {
+    this.startButton = this.createButton(width / 2, height - 35, 'LANCER LA PARTIE', () => {
       this.network.startGame();
     });
   }
@@ -335,6 +348,7 @@ export class LobbyScene extends Phaser.Scene {
   private cleanup() {
     this.removeInput();
     this.network.removeAllGameListeners();
+    this.game.canvas.removeEventListener('touchstart', this.blurHandler);
   }
 
   shutdown() {

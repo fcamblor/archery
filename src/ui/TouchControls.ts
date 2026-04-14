@@ -141,22 +141,22 @@ export class TouchControls extends Phaser.Scene {
   private handlePointerDown(pointer: Phaser.Input.Pointer) {
     const { x, y } = pointer;
 
-    // Zone joystick (moitié gauche de l'écran)
-    if (x < this.scale.width / 2 && this.joystickPointerId === null) {
+    // Bouton menu (testé en premier pour ne pas être capturé par la zone joystick)
+    if (this.hitTest(x, y, this.menuBtn, 18 * 1.5)) {
+      this._menuJustPressed = true;
+      this.state.menu = true;
+      this.menuBtn.setAlpha(UI_ALPHA_ACTIVE);
+      return;
+    }
+
+    // Zone joystick (quart inférieur gauche de l'écran)
+    if (x < this.scale.width / 2 && y > this.scale.height / 2 && this.joystickPointerId === null) {
       this.joystickPointerId = pointer.id;
       // Repositionner le joystick à l'endroit du toucher
       this.joystickCenter = { x, y };
       this.joystickBase.setPosition(x, y);
       this.joystickThumb.setPosition(x, y);
       this.joystickBase.setAlpha(UI_ALPHA_ACTIVE);
-      return;
-    }
-
-    // Bouton menu
-    if (this.hitTest(x, y, this.menuBtn, 18 * 1.5)) {
-      this._menuJustPressed = true;
-      this.state.menu = true;
-      this.menuBtn.setAlpha(UI_ALPHA_ACTIVE);
       return;
     }
 
