@@ -1,47 +1,37 @@
 import Phaser from 'phaser';
 import { ComboState, ComboTier } from '../entities/ComboTracker';
 
-const TIER_LABELS: Record<ComboTier, string> = {
-  none: '',
-  good: 'GOOD!',
-  great: 'GREAT!!',
-  amazing: 'AMAZING!!!',
-};
-
-const TIER_COLORS: Record<ComboTier, string> = {
-  none: '#f4a261',
-  good: '#f4a261',
-  great: '#e76f51',
-  amazing: '#e9c46a',
-};
-
-const TIER_FONT_SIZES: Record<ComboTier, string> = {
-  none: '16px',
-  good: '16px',
-  great: '20px',
-  amazing: '24px',
+const TIER_CONFIG: Record<ComboTier, { label: string; color: string; fontSize: string }> = {
+  none: { label: '', color: '#f4a261', fontSize: '16px' },
+  good: { label: 'GOOD!', color: '#f4a261', fontSize: '16px' },
+  great: { label: 'GREAT!!', color: '#e76f51', fontSize: '20px' },
+  amazing: { label: 'AMAZING!!!', color: '#e9c46a', fontSize: '24px' },
 };
 
 export class ComboHUD {
   private scene: Phaser.Scene;
   private countText: Phaser.GameObjects.Text;
   private tierText: Phaser.GameObjects.Text;
+  private baseX: number;
   private punchTween: Phaser.Tweens.Tween | null = null;
   private shakeTween: Phaser.Tweens.Tween | null = null;
+  private hideTween: Phaser.Tweens.Tween | null = null;
+  private flashTween: Phaser.Tweens.Tween | null = null;
   private flashRect: Phaser.GameObjects.Rectangle | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    this.baseX = scene.scale.width / 2;
 
     this.countText = scene.add.text(
-      scene.scale.width / 2,
+      this.baseX,
       scene.scale.height * 0.3,
       '',
       { fontSize: '16px', fontFamily: 'monospace', color: '#f4a261' },
     ).setOrigin(0.5).setDepth(200).setVisible(false);
 
     this.tierText = scene.add.text(
-      scene.scale.width / 2,
+      this.baseX,
       scene.scale.height * 0.3 + 18,
       '',
       { fontSize: '10px', fontFamily: 'monospace', color: '#f4a261' },
@@ -50,14 +40,14 @@ export class ComboHUD {
 
   animateHit(state: ComboState): void {
     const { count, tier } = state;
+    const config = TIER_CONFIG[tier];
 
-    // Update text content and style
     this.countText.setText(`x${count}`);
-    this.countText.setFontSize(TIER_FONT_SIZES[tier]);
-    this.countText.setColor(TIER_COLORS[tier]);
+    this.countText.setFontSize(config.fontSize);
+    this.countText.setColor(config.color);
 
-    this.tierText.setText(TIER_LABELS[tier]);
-    this.tierText.setColor(TIER_COLORS[tier]);
+    this.tierText.setText(config.label);
+    this.tierText.setColor(config.color);
 
     this.countText.setVisible(true).setAlpha(1);
     this.tierText.setVisible(true).setAlpha(1);
@@ -75,15 +65,14 @@ export class ComboHUD {
     // Shake for great+ tiers
     if (tier === 'great' || tier === 'amazing') {
       if (this.shakeTween) this.shakeTween.stop();
-      const baseX = this.scene.scale.width / 2;
-      this.countText.x = baseX;
+      this.countText.x = this.baseX;
       this.shakeTween = this.scene.tweens.add({
         targets: this.countText,
-        x: baseX + 2,
+        x: this.baseX + 2,
         duration: 50,
         yoyo: true,
         repeat: 2,
-        onComplete: () => { this.countText.x = baseX; },
+        onComplete: () => { this.countText.x = this.baseX; },
       });
     }
 
@@ -95,7 +84,8 @@ export class ComboHUD {
 
   hideCombo(finalCount: number): void {
     this.countText.setText(`x${finalCount}`);
-    this.scene.tweens.add({
+    if (this.hideTween) this.hideTween.stop();
+    this.hideTween = this.scene.tweens.add({
       targets: [this.countText, this.tierText],
       alpha: 0,
       duration: 300,
@@ -110,6 +100,8 @@ export class ComboHUD {
   destroy(): void {
     this.punchTween?.stop();
     this.shakeTween?.stop();
+    this.hideTween?.stop();
+    this.flashTween?.stop();
     this.countText.destroy();
     this.tierText.destroy();
     this.flashRect?.destroy();
@@ -127,7 +119,8 @@ export class ComboHUD {
     }
 
     this.flashRect.setAlpha(0.3);
-    this.scene.tweens.add({
+    if (this.flashTween) this.flashTween.stop();
+    this.flashTween = this.scene.tweens.add({
       targets: this.flashRect,
       alpha: 0,
       duration: 100,
