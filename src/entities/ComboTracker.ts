@@ -13,7 +13,8 @@ export interface ComboCallbacks {
   onComboEnd: (finalCount: number) => void;
 }
 
-export const COMBO_DEBOUNCE = 600; // ms entre deux kills pour maintenir le combo
+// 600ms : légèrement au-dessus du temps de réaction typique (~500ms) pour laisser de la marge aux kills flèche enchaînés
+export const COMBO_DEBOUNCE = 600;
 
 export function getTier(count: number): ComboTier {
   if (count < 2) return 'none';
@@ -40,15 +41,14 @@ export class ComboTracker {
     if (comboActive) {
       this.count++;
     } else {
-      // Terminer le combo précédent s'il existait
-      if (this.count >= 2) {
-        this.callbacks.onComboEnd(this.count);
-      }
+      this.endCombo();
       this.count = 1;
     }
 
     this.lastKillTime = now;
-    this.airborne = true;
+    if (type === 'stomp') {
+      this.airborne = true;
+    }
     this.lastKillType = type;
 
     const state = this.getState();
@@ -73,13 +73,7 @@ export class ComboTracker {
   }
 
   reset(): void {
-    if (this.count >= 2) {
-      this.callbacks.onComboEnd(this.count);
-    }
-    this.count = 0;
-    this.airborne = false;
-    this.lastKillType = null;
-    this.lastKillTime = 0;
+    this.endCombo();
   }
 
   getState(): ComboState {
@@ -98,5 +92,6 @@ export class ComboTracker {
     this.count = 0;
     this.airborne = false;
     this.lastKillType = null;
+    this.lastKillTime = 0;
   }
 }
