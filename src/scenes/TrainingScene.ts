@@ -219,9 +219,7 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   private setupCombo() {
-    this.comboTracker = new ComboTracker(
-      () => !!(this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body).blocked.down,
-    );
+    this.comboTracker = new ComboTracker();
     this.comboDisplay = new ComboDisplay(this);
   }
 
@@ -236,16 +234,17 @@ export class TrainingScene extends Phaser.Scene {
     // Update joueur
     this.localPlayer.update(delta);
 
-    // Détection transition airborne → sol pour le combo
-    const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
-    const grounded = body.blocked.down;
-    if (grounded && !this.wasGrounded) {
-      this.comboTracker.onGrounded();
+    // On détecte la transition (et non l'état) pour éviter d'appeler onGrounded() en boucle
+    // lorsque le joueur marche au sol — un appel par frame tuerait le combo dès que le timer expire
+    if (this.localPlayer.alive) {
+      const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
+      const grounded = body.blocked.down;
+      if (grounded && !this.wasGrounded) {
+        this.comboTracker.onGrounded();
+      }
+      this.wasGrounded = grounded;
+      this.comboTracker.update(delta, grounded);
     }
-    this.wasGrounded = grounded;
-
-    // Update combo timer
-    this.comboTracker.update(delta);
     this.comboDisplay.update(this.comboTracker.count);
 
     // Update mobs
