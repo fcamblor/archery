@@ -193,3 +193,222 @@ Pas besoin de compteur multi-frame ou de délai de grâce supplémentaire — le
 | `src/ui/ComboHUD.ts` | **Création** | ~80 lignes |
 | `src/scenes/TrainingScene.ts` | Modification | ~15 lignes ajoutées |
 | `docs/` | Mise à jour | Documenter le système combo |
+
+---
+
+## Couche 3 — Finitions
+
+### 3.1 ComboTracker — détail d'implémentation
+
+**Constructeur :**
+```typescript
+constructor(callbacks: ComboCallbacks)
+```
+Pas de dépendance Phaser — le temps est injecté via les arguments `now` des méthodes. Cela permet de tester la logique sans Phaser.
+
+**`registerKill(type, now)` — pseudo-code :**
+```
+si count > 0 ET (now - lastKillTime < DEBOUNCE OU airborne):
+  count++
+  → combo continue
+sinon:
+  si count >= 2:
+    callbacks.onComboEnd(count)
+  count = 1
+  → nouveau combo (pas encore un "combo" affiché)
+
+lastKillTime = now
+airborne = true      // chaque kill remet le joueur "en l'air" logiquement
+lastKillType = type
+tier = getTier(count)
+
+si count >= 2:
+  callbacks.onComboHit({ count, active: true, lastKillType, tier })
+
+retourne state
+```
+
+**`update(now)` — pseudo-code :**
+```
+si count < 2 OU !active: retourne
+si (now - lastKillTime >= DEBOUNCE) ET (!airborne):
+  endCombo()
+```
+
+**`notifyGrounded(now)` — pseudo-code :**
+```
+airborne = false
+si (now - lastKillTime >= DEBOUNCE):
+  endCombo()
+```
+
+**`endCombo()` :**
+```
+si count >= 2:
+  callbacks.onComboEnd(count)
+count = 0
+airborne = false
+lastKillType = null
+tier = 'none'
+```
+
+**`getTier(count)` :**
+```
+si count < 2: 'none'
+si count <= 3: 'good'
+si count <= 6: 'great'
+sinon: 'amazing'
+```
+
+**Edge case — kill simultané (même frame) :** Deux mobs tués par la même flèche dans `updateArrows()` → `registerKill` est appelé deux fois avec le même `now`. Le deuxième appel voit `now - lastKillTime === 0 < DEBOUNCE` → combo continue. Pas de traitement spécial nécessaire.
+
+### 3.2 ComboHUD — détail d'implémentation
+
+**Constructeur :**
+```typescript
+constructor(scene: Phaser.Scene)
+```
+
+**Création des textes (dans le constructeur) :**
+```typescript
+// Compteur principal — ex: "x3"
+this.countText = scene.add.text(
+  scene.scale.width / 2,
+  scene.scale.height * 0.3,
+  '', { fontSize: '16px', fontFamily: 'monospace', color: '#f4a261' }
+).setOrigin(0.5).setDepth(200).setVisible(false);
+
+// Label tier — ex: "GREAT!!"
+this.tierText = scene.add.text(
+  scene.scale.width / 2,
+  scene.scale.height * 0.3 + 18,
+  '', { fontSize: '10px', fontFamily: 'monospace', color: '#f4a261' }
+).setOrigin(0.5).setDepth(200).setVisible(false);
+```
+
+**Depth 200** pour passer au-dessus du HUD existant (depth 100).
+
+**`showCombo(state: ComboState)` :**
+```typescript
+const { count, tier } = state;
+this.countText.setText(`x${count}`);
+this.tierText.setText(TIER_LABELS[tier]);  // { good: 'GOOD!', great: 'GREAT!!', amazing: 'AMAZING!!!' }
+
+// Appliquer le style du tier
+this.countText.setFontSize(TIER_FONT_SIZE[tier]);  // { good: '16px', great: '20px', amazing: '24px' }
+this.countText.setColor(TIER_COLOR[tier]);          // { good: '#f4a261', great: '#e76f51', amazing: '#e9c46a' }
+this.tierText.setColor(TIER_COLOR[tier]);
+
+this.countText.setVisible(true).setAlpha(1);
+this.tierText.setVisible(true).setAlpha(1);
+```
+
+**`animateHit(state)` — punch effect :**
+```typescript
+// Stopper le tween précédent s'il est encore actif
+if (this.punchTween) this.punchTween.stop();
+
+this.showCombo(state);
+this.countText.setScale(1);
+this.punchTween = this.scene.tweens.add({
+  targets: this.countText,
+  scale: { from: 1.3, to: 1 },
+  duration: 150,
+  ease: 'Back.easeOut',
+});
+```
+
+**Shake (tiers great + amazing) :**
+Utiliser un tween sur `x` du `countText` : oscillation ±2px en 50ms × 3 répétitions. Pas de `scene.cameras.main.shake()` — trop global, ça secouerait aussi le gameplay.
+
+**Flash blanc (tier amazing uniquement) :**
+Rectangle blanc plein écran, alpha 0.3→0 en 100ms. Créé une seule fois, réutilisé.
+
+**`hideCombo(finalCount)` :**
+```typescript
+// Afficher le score final brièvement puis fade out
+this.countText.setText(`x${finalCount}`);
+this.scene.tweens.add({
+  targets: [this.countText, this.tierText],
+  alpha: 0,
+  duration: 300,
+  delay: 200,  // Laisser visible 200ms après la fin
+  onComplete: () => {
+    this.countText.setVisible(false);
+    this.tierText.setVisible(false);
+  },
+});
+```
+
+**`destroy()` :** Détruire `countText`, `tierText`, et le rectangle flash si créé.
+
+### 3.3 Intégration TrainingScene — détail
+
+**`create()` — ordre d'instanciation :**
+```typescript
+// Après setupHUD(), avant setupTouchControls()
+this.comboHUD = new ComboHUD(this);
+this.comboTracker = new ComboTracker({
+  onComboHit: (state) => this.comboHUD.animateHit(state),
+  onComboEnd: (finalCount) => this.comboHUD.hideCombo(finalCount),
+});
+```
+
+**`update()` — insertion à la ligne 224 :**
+```typescript
+// Update joueur
+this.localPlayer.update(delta);
+
+// Combo : détecter contact au sol
+if (this.localPlayer.alive) {
+  const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
+  if (body.blocked.down) {
+    this.comboTracker.notifyGrounded(this.time.now);
+  }
+  this.comboTracker.update(this.time.now);
+}
+```
+
+Le cast `body as Phaser.Physics.Arcade.Body` est déjà le pattern utilisé partout dans le code existant (cf. `checkStomps()` ligne 288).
+
+**Mort du joueur — reset dans `scheduleRespawnPlayer()` (ligne 321) :**
+Appeler `this.comboTracker.reset()` DANS le callback de `delayedCall`, pas avant — pour que le combo reste visible pendant l'animation de mort et se fade out proprement. Alternative : appeler `reset()` immédiatement dans le bloc `else` de `checkStomps()` quand le joueur meurt (ligne 303). La première option est plus propre visuellement.
+
+**`cleanupGame()` — ajout :**
+```typescript
+this.comboHUD?.destroy();
+this.comboTracker?.reset();
+```
+
+### 3.4 Mise à jour de la documentation
+
+**`docs/GAME_DESIGN.md`** — ajouter une section après "Condition de victoire" :
+```markdown
+## Combos (mode entraînement)
+
+Un combo est un enchaînement de kills de mobs. Deux mécanismes déclencheurs, mixables :
+- **Combo flèche** : tuer un mob par flèche dans les 600ms suivant le kill précédent
+- **Combo rebond** : tuer un mob par stomp sans retoucher le sol entre les kills
+
+Le combo ne se casse que quand les deux conditions sont réunies : le timer debounce
+(600ms) a expiré ET le joueur a retouché le sol. Un affichage visuel indique le
+combo en cours avec des paliers progressifs (good, great, amazing).
+```
+
+**`docs/ARCHITECTURE.md`** — ajouter dans la section structure du projet :
+```
+  entities/
+    ComboTracker.ts  — Logique de détection de combos (pas de dépendance Phaser)
+  ui/
+    ComboHUD.ts      — Affichage visuel du combo en cours
+```
+
+Et une brève section "Combos" décrivant le pattern ComboTracker→callbacks→ComboHUD.
+
+### 3.5 Ordre d'implémentation suggéré
+
+1. **ComboTracker** — logique pure, testable manuellement via console
+2. **Intégration TrainingScene** — brancher `registerKill` + `notifyGrounded` + `update`, avec des `console.log` en callback pour vérifier
+3. **ComboHUD** — affichage et animations
+4. **Playtesting** — ajuster `COMBO_DEBOUNCE` (600ms initial, tunable)
+5. **Documentation** — mise à jour `docs/`
