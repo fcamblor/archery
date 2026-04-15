@@ -65,6 +65,22 @@ Un joueur peut être tué par :
 - À la fin de la partie (5 points), retour automatique au lobby après 5 secondes
 - Un joueur déconnecté en cours de partie est considéré comme éliminé
 
+## Combos (mode entraînement)
+
+Un combo est un enchaînement de kills de mobs. Deux mécanismes déclencheurs, mixables :
+- **Combo flèche** : tuer un mob par flèche dans les 600ms suivant le kill précédent
+- **Combo rebond** : tuer un mob par stomp sans retoucher le sol entre les kills
+
+Le combo ne se casse que quand les deux conditions sont réunies : le timer debounce (600ms) a expiré ET le joueur a retouché le sol. Un affichage visuel indique le combo en cours avec des paliers progressifs :
+
+| Palier | Kills | Couleur | Effet |
+|--------|-------|---------|-------|
+| Good | 2-3 | Orange | Scale-up |
+| Great | 4-6 | Rouge-orange | Scale-up + shake |
+| Amazing | 7+ | Doré | Scale-up + shake + flash blanc |
+
+Le combo est un feedback visuel pur — pas de multiplicateur de score en v1.
+
 ## Flèches — indicateur visuel
 
 - Les flèches plantées dans le décor sont **teintées avec la couleur du joueur** qui les a tirées, permettant de savoir à qui elles appartiennent

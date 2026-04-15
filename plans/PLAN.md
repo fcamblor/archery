@@ -53,6 +53,13 @@
 - [x] Flèches plantées teintées avec la couleur du joueur propriétaire
 
 
+## Itération 6b — Mode entraînement + Combos ✅
+- [x] Scène d'entraînement solo (TrainingScene)
+- [x] Système de combo : enchaînement de kills via flèche (debounce 600ms) ou stomp aérien
+- [x] ComboTracker découplé (logique pure, sans dépendance Phaser)
+- [x] ComboHUD avec paliers visuels progressifs (Good/Great/Amazing)
+- [x] Intégration dans TrainingScene (registerKill, notifyGrounded, reset sur respawn)
+
 ## Itération 7 — Niveaux multiples
 - [ ] 3-4 niveaux avec designs de plateformes variés
 - [ ] Cohérence du wrap-around aux bords (plateformes symétriques)

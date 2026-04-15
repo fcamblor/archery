@@ -4,6 +4,8 @@ import { Arrow } from '../entities/Arrow';
 import { Mob } from '../entities/Mob';
 import { LEVEL_1 } from '../levels/level1';
 import { TouchControls, isTouchDevice } from '../ui/TouchControls';
+import { ComboTracker } from '../entities/ComboTracker';
+import { ComboHUD } from '../ui/ComboHUD';
 
 const TILE_SIZE = 16;
 const MOB_COUNT = 5;
@@ -44,6 +46,8 @@ export class TrainingScene extends Phaser.Scene {
   private score = 0;
   private hudText!: Phaser.GameObjects.Text;
   private touchControls: TouchControls | null = null;
+  private comboTracker!: ComboTracker;
+  private comboHUD!: ComboHUD;
 
   constructor() {
     super('TrainingScene');
@@ -59,6 +63,11 @@ export class TrainingScene extends Phaser.Scene {
     this.setupShooting();
     this.spawnInitialMobs();
     this.setupHUD();
+    this.comboTracker = new ComboTracker({
+      onComboHit: (state) => this.comboHUD.animateHit(state),
+      onComboEnd: (finalCount) => this.comboHUD.hideCombo(finalCount),
+    });
+    this.comboHUD = new ComboHUD(this);
     this.setupTouchControls();
   }
 
@@ -223,6 +232,15 @@ export class TrainingScene extends Phaser.Scene {
     // Update joueur
     this.localPlayer.update(delta);
 
+    // Combo : le sol brise le combo rebond si le debounce est aussi expiré
+    if (this.localPlayer.alive) {
+      const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body | null;
+      if (body?.blocked.down) {
+        this.comboTracker.notifyGrounded(this.time.now);
+      }
+      this.comboTracker.update(this.time.now);
+    }
+
     // Update mobs
     for (const mob of this.mobs) {
       mob.update();
@@ -255,6 +273,7 @@ export class TrainingScene extends Phaser.Scene {
             mob.die(false);
             arrow.drop();
             this.score++;
+            this.comboTracker.registerKill('arrow', this.time.now);
             this.scheduleRespawnMob();
             break;
           }
@@ -298,6 +317,7 @@ export class TrainingScene extends Phaser.Scene {
           localBody.setVelocityY(-200);
           this.stompEffect(mob.sprite.x, mob.sprite.y);
           this.score++;
+          this.comboTracker.registerKill('stomp', this.time.now);
           this.scheduleRespawnMob();
         } else if (!this.localPlayer.invincible && !mob.harmless) {
           // Contact sans stomp : le mob tue le joueur (sauf si invincible ou mob inoffensif)
@@ -319,6 +339,7 @@ export class TrainingScene extends Phaser.Scene {
 
   private scheduleRespawnPlayer() {
     this.time.delayedCall(PLAYER_RESPAWN_DELAY, () => {
+      this.comboTracker.reset();
       const sp = Phaser.Utils.Array.GetRandom(PLAYER_SPAWN_POINTS);
       this.localPlayer.respawn(sp.x, sp.y, true);
       this.localPlayer.setInvincible(PLAYER_INVINCIBLE_DURATION);
@@ -383,6 +404,8 @@ export class TrainingScene extends Phaser.Scene {
       arrow.destroy();
     }
     this.arrows = [];
+    this.comboTracker?.reset();
+    this.comboHUD?.destroy();
     this.localPlayer?.destroy();
     if (this.touchControls) {
       this.scene.stop('TouchControlsScene');
