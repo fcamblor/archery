@@ -9,7 +9,7 @@ src/
     TitleScene.ts    — Écran titre (Héberger / Rejoindre)
     LobbyScene.ts    — Lobby (joueurs connectés, code, lancement)
     GameScene.ts     — Scène de jeu principale (multijoueur réseau)
-  entities/          — Entités de jeu (Player, Arrow, Mob)
+  entities/          — Entités de jeu (Player, Arrow, Mob, ComboTracker)
   network/
     NetworkManager.ts — Singleton Socket.io (connexion, rooms, gameplay)
   shared/
@@ -48,6 +48,15 @@ Le serveur agit principalement comme un relais. Chaque client exécute sa propre
 ### Points de spawn
 
 Le serveur attribue un point de spawn fixe à chaque joueur au lancement (6 positions prédéfinies réparties sur le niveau). Les spawn points sont envoyés via l'événement `game-starting`.
+
+## Combos (mode entraînement)
+
+Le système de combo est composé de deux éléments découplés :
+
+- **ComboTracker** (`src/entities/ComboTracker.ts`) — logique pure sans dépendance Phaser. Reçoit les événements `registerKill(type, now)` et `notifyGrounded(now)`, détecte les enchaînements via debounce temporel (600ms) et suivi de l'état aérien. Émet des callbacks `onComboHit` / `onComboEnd`.
+- **ComboHUD** (`src/ui/ComboHUD.ts`) — affichage Phaser du compteur de combo avec animations progressives par palier (punch, shake, flash). Piloté par les callbacks du tracker.
+
+L'intégration dans `TrainingScene` se fait via 4 points d'accroche : `updateArrows()` et `checkStomps()` appellent `registerKill()`, `update()` gère la détection du sol et la mise à jour du tracker, `scheduleRespawnPlayer()` appelle `reset()`.
 
 ## Physique
 
