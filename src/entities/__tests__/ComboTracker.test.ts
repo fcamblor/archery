@@ -59,8 +59,8 @@ describe('ComboTracker', () => {
     it('le timer se réinitialise à chaque kill', () => {
       tracker.registerKill('arrow', 1000);
       tracker.registerKill('arrow', 1500); // +500ms → combo
-      // Le timer repart de 1500, donc 2099 est encore valide
-      const state = tracker.registerKill('arrow', 2099);
+      // Le timer repart de 1500, donc 1500 + COMBO_DEBOUNCE - 1 est encore valide
+      const state = tracker.registerKill('arrow', 1500 + COMBO_DEBOUNCE - 1);
       expect(state.count).toBe(3);
     });
 
@@ -188,6 +188,52 @@ describe('ComboTracker', () => {
       // airborne, debounce expiré
       const state = tracker.registerKill('arrow', 1000 + COMBO_DEBOUNCE + 500);
       expect(state.count).toBe(2);
+    });
+
+    it('notifyGrounded est un no-op quand count < 2', () => {
+      tracker.registerKill('arrow', 1000); // count=1
+      tracker.notifyGrounded(1000 + COMBO_DEBOUNCE);
+      expect(cb.onComboEnd).not.toHaveBeenCalled();
+      expect(tracker.getState().count).toBe(1);
+    });
+
+    it('notifyGrounded est un no-op sur un tracker vierge', () => {
+      tracker.notifyGrounded(1000);
+      expect(cb.onComboEnd).not.toHaveBeenCalled();
+    });
+
+    it('update est un early-return quand count < 2', () => {
+      tracker.registerKill('arrow', 1000); // count=1
+      tracker.update(1000 + COMBO_DEBOUNCE + 100);
+      expect(cb.onComboEnd).not.toHaveBeenCalled();
+      expect(tracker.getState().count).toBe(1);
+    });
+
+    it('update est un early-return sur un tracker vierge', () => {
+      tracker.update(5000);
+      expect(cb.onComboEnd).not.toHaveBeenCalled();
+    });
+
+    it('reset sur un tracker vierge ne plante pas et n\'émet rien', () => {
+      tracker.reset();
+      expect(cb.onComboEnd).not.toHaveBeenCalled();
+      expect(tracker.getState().count).toBe(0);
+    });
+
+    it('un seul kill ne déclenche ni onComboHit ni onComboEnd', () => {
+      tracker.registerKill('arrow', 1000);
+      expect(cb.onComboHit).not.toHaveBeenCalled();
+      expect(cb.onComboEnd).not.toHaveBeenCalled();
+    });
+
+    it('registerKill après debounce quand grounded termine l\'ancien combo et en démarre un nouveau', () => {
+      tracker.registerKill('arrow', 1000);
+      tracker.registerKill('arrow', 1200); // combo x2
+      tracker.notifyGrounded(1300); // grounded, debounce pas encore expiré
+      // Kill après debounce, joueur toujours au sol (pas de notifyGrounded intermédiaire)
+      tracker.registerKill('arrow', 1200 + COMBO_DEBOUNCE + 100);
+      expect(cb.ends).toContain(2); // ancien combo terminé par registerKill
+      expect(tracker.getState().count).toBe(1); // nouveau compteur
     });
   });
 });
