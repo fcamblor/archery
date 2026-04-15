@@ -53,6 +53,13 @@
 - [x] Flèches plantées teintées avec la couleur du joueur propriétaire
 
 
+## Itération L2 — Mode entraînement : système de combos ✅
+- [x] `ComboTracker` — logique pure de suivi des combos (timer, reset au sol, bestCombo)
+- [x] `ComboDisplay` — affichage HUD du compteur de combo (punch visuel, fondu)
+- [x] Branchement dans `TrainingScene` (détection air→sol, kills, reset sur mort)
+- [x] Tests unitaires `ComboTracker`
+- [x] Documentation (`ARCHITECTURE.md`, `GAME_DESIGN.md`)
+
 ## Itération 7 — Niveaux multiples
 - [ ] 3-4 niveaux avec designs de plateformes variés
 - [ ] Cohérence du wrap-around aux bords (plateformes symétriques)
