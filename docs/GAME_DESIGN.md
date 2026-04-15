@@ -68,3 +68,15 @@ Un joueur peut être tué par :
 ## Flèches — indicateur visuel
 
 - Les flèches plantées dans le décor sont **teintées avec la couleur du joueur** qui les a tirées, permettant de savoir à qui elles appartiennent
+
+## Mode entraînement — Système de combos
+
+Un **combo** est une séquence de kills enchaînés. Deux mécaniques de continuation coexistent :
+
+1. **Kill par flèche** : le combo continue si le kill suivant arrive dans les 500 ms.
+2. **Kill par stomp (aérien)** : le combo continue tant que le joueur ne retouche pas le sol.
+
+Les deux mécaniques se mixent : un kill flèche relance le timer pendant un combo aérien, et un stomp maintient le combo même si le timer a expiré. Le combo se reset quand le timer a expiré **ET** le joueur touche le sol, ou à la mort du joueur.
+
+- Compteur affiché à l'écran à partir de **x2** (`COMBO x2`, `COMBO x3`, etc.)
+- Meilleur combo de la session affiché dans le HUD

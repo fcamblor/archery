@@ -119,6 +119,12 @@ Les tuiles verticalement adjacentes sont fusionnées en un seul body physique lo
 - Chaque flèche porte un `ownerColor` (couleur du joueur tireur), transmis via `ArrowData`.
 - Quand une flèche se plante (`stick()` ou `stickAt()`), un `setTint(ownerColor)` est appliqué au sprite pour indiquer visuellement le propriétaire.
 
+## Mode entraînement — Combos
+
+- `ComboTracker` (`src/training/ComboTracker.ts`) : logique pure de suivi des combos, découplée de Phaser via un callback `isGrounded`. Timer debounce de 500 ms, reset quand timer expiré + joueur au sol.
+- `ComboDisplay` (`src/training/ComboDisplay.ts`) : affichage HUD du compteur (texte centré, scale tween à chaque incrément, fondu à la disparition).
+- Branchement dans `TrainingScene` : `onKill()` sur kills flèche/stomp, `onGrounded()` sur transition airborne→sol, `reset()` sur mort joueur.
+
 ## Outils de développement
 
 ### Profilage avec Chrome DevTools MCP
