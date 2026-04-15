@@ -4,6 +4,8 @@ import { Arrow } from '../entities/Arrow';
 import { Mob } from '../entities/Mob';
 import { LEVEL_1 } from '../levels/level1';
 import { TouchControls, isTouchDevice } from '../ui/TouchControls';
+import { ComboTracker } from '../training/ComboTracker';
+import { ComboDisplay } from '../training/ComboDisplay';
 
 const TILE_SIZE = 16;
 const MOB_COUNT = 5;
@@ -44,6 +46,9 @@ export class TrainingScene extends Phaser.Scene {
   private score = 0;
   private hudText!: Phaser.GameObjects.Text;
   private touchControls: TouchControls | null = null;
+  private comboTracker!: ComboTracker;
+  private comboDisplay!: ComboDisplay;
+  private wasGrounded = false;
 
   constructor() {
     super('TrainingScene');
@@ -60,6 +65,7 @@ export class TrainingScene extends Phaser.Scene {
     this.spawnInitialMobs();
     this.setupHUD();
     this.setupTouchControls();
+    this.setupCombo();
   }
 
   private buildLevel() {
@@ -212,6 +218,13 @@ export class TrainingScene extends Phaser.Scene {
     }
   }
 
+  private setupCombo() {
+    this.comboTracker = new ComboTracker(
+      () => !!(this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body).blocked.down,
+    );
+    this.comboDisplay = new ComboDisplay(this);
+  }
+
   update(time: number, delta: number) {
     // Bouton menu tactile → retour au titre
     if (this.touchControls?.consumeMenuPress()) {
@@ -222,6 +235,18 @@ export class TrainingScene extends Phaser.Scene {
 
     // Update joueur
     this.localPlayer.update(delta);
+
+    // Détection transition airborne → sol pour le combo
+    const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
+    const grounded = body.blocked.down;
+    if (grounded && !this.wasGrounded) {
+      this.comboTracker.onGrounded();
+    }
+    this.wasGrounded = grounded;
+
+    // Update combo timer
+    this.comboTracker.update(delta);
+    this.comboDisplay.update(this.comboTracker.count);
 
     // Update mobs
     for (const mob of this.mobs) {
@@ -255,6 +280,7 @@ export class TrainingScene extends Phaser.Scene {
             mob.die(false);
             arrow.drop();
             this.score++;
+            this.comboTracker.onKill();
             this.scheduleRespawnMob();
             break;
           }
@@ -264,6 +290,7 @@ export class TrainingScene extends Phaser.Scene {
         if (this.localPlayer.alive && !this.localPlayer.invincible && arrow.canHitOwner && arrow.armed) {
           if (this.tipHitsSprite(tip, this.localPlayer.sprite)) {
             this.localPlayer.die();
+            this.comboTracker.reset();
             arrow.drop();
             this.scheduleRespawnPlayer();
           }
@@ -298,10 +325,12 @@ export class TrainingScene extends Phaser.Scene {
           localBody.setVelocityY(-200);
           this.stompEffect(mob.sprite.x, mob.sprite.y);
           this.score++;
+          this.comboTracker.onKill();
           this.scheduleRespawnMob();
         } else if (!this.localPlayer.invincible && !mob.harmless) {
           // Contact sans stomp : le mob tue le joueur (sauf si invincible ou mob inoffensif)
           this.localPlayer.die();
+          this.comboTracker.reset();
           this.scheduleRespawnPlayer();
           return; // Le joueur est mort, pas besoin de continuer
         }
@@ -328,9 +357,11 @@ export class TrainingScene extends Phaser.Scene {
 
   private updateHUD() {
     const aliveMobs = this.mobs.filter(m => m.alive).length;
-    this.hudText.setText(
-      `FPS: ${Math.round(this.game.loop.actualFps)} | score: ${this.score} | mobs: ${aliveMobs} | fleches: ${this.arrows.length}`,
-    );
+    let hud = `FPS: ${Math.round(this.game.loop.actualFps)} | score: ${this.score} | mobs: ${aliveMobs} | fleches: ${this.arrows.length}`;
+    if (this.comboTracker.bestCombo >= 2) {
+      hud += ` | best combo: ${this.comboTracker.bestCombo}`;
+    }
+    this.hudText.setText(hud);
   }
 
   private isStomping(stomper: Phaser.Physics.Arcade.Sprite, target: Phaser.Physics.Arcade.Sprite): boolean {
@@ -383,6 +414,7 @@ export class TrainingScene extends Phaser.Scene {
       arrow.destroy();
     }
     this.arrows = [];
+    this.comboDisplay?.destroy();
     this.localPlayer?.destroy();
     if (this.touchControls) {
       this.scene.stop('TouchControlsScene');
