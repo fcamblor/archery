@@ -63,11 +63,11 @@ export class TrainingScene extends Phaser.Scene {
     this.setupShooting();
     this.spawnInitialMobs();
     this.setupHUD();
-    this.comboHUD = new ComboHUD(this);
     this.comboTracker = new ComboTracker({
       onComboHit: (state) => this.comboHUD.animateHit(state),
       onComboEnd: (finalCount) => this.comboHUD.hideCombo(finalCount),
     });
+    this.comboHUD = new ComboHUD(this);
     this.setupTouchControls();
   }
 
@@ -232,10 +232,10 @@ export class TrainingScene extends Phaser.Scene {
     // Update joueur
     this.localPlayer.update(delta);
 
-    // Combo : détecter contact au sol et mettre à jour le tracker
+    // Combo : le sol brise le combo rebond si le debounce est aussi expiré
     if (this.localPlayer.alive) {
-      const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body;
-      if (body.blocked.down) {
+      const body = this.localPlayer.sprite.body as Phaser.Physics.Arcade.Body | null;
+      if (body?.blocked.down) {
         this.comboTracker.notifyGrounded(this.time.now);
       }
       this.comboTracker.update(this.time.now);
@@ -404,8 +404,8 @@ export class TrainingScene extends Phaser.Scene {
       arrow.destroy();
     }
     this.arrows = [];
-    this.comboHUD?.destroy();
     this.comboTracker?.reset();
+    this.comboHUD?.destroy();
     this.localPlayer?.destroy();
     if (this.touchControls) {
       this.scene.stop('TouchControlsScene');
