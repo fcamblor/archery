@@ -2,12 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ComboTracker } from './ComboTracker';
 
 describe('ComboTracker', () => {
-  let grounded: boolean;
   let tracker: ComboTracker;
 
   beforeEach(() => {
-    grounded = true;
-    tracker = new ComboTracker(() => grounded);
+    tracker = new ComboTracker();
   });
 
   describe('onKill', () => {
@@ -22,66 +20,69 @@ describe('ComboTracker', () => {
   describe('combo par flèches (timer)', () => {
     it('maintient le combo si kills enchaînés avant expiration du timer', () => {
       tracker.onKill();
-      tracker.update(200); // 200ms écoulées, timer pas expiré
+      tracker.update(200, false);
       tracker.onKill();
       expect(tracker.count).toBe(2);
     });
 
     it('reset le combo quand le timer expire et le joueur est au sol', () => {
-      grounded = true;
       tracker.onKill();
-      tracker.update(501); // timer expiré + joueur au sol → reset
+      tracker.update(501, true);
       expect(tracker.count).toBe(0);
     });
 
     it('ne reset PAS si le timer expire mais le joueur est en l\'air', () => {
-      grounded = false;
       tracker.onKill();
-      tracker.update(501);
-      expect(tracker.count).toBe(1); // toujours actif
+      tracker.update(501, false);
+      expect(tracker.count).toBe(1);
     });
 
     it('reset quand le joueur atterrit après expiration du timer', () => {
-      grounded = false;
       tracker.onKill();
-      tracker.update(501); // timer expire, joueur en l'air → pas de reset
+      tracker.update(501, false);
       expect(tracker.count).toBe(1);
-      tracker.onGrounded(); // maintenant il atterrit → reset
+      tracker.onGrounded();
       expect(tracker.count).toBe(0);
     });
   });
 
   describe('combo aérien (stomp)', () => {
     it('maintient le combo si le joueur ne touche pas le sol entre les kills', () => {
-      grounded = false;
-      tracker.onKill(); // stomp kill 1
-      tracker.update(600); // timer expiré mais en l'air
-      tracker.onKill(); // stomp kill 2 → relance le timer
+      tracker.onKill();
+      tracker.update(600, false);
+      tracker.onKill();
       expect(tracker.count).toBe(2);
-      expect(tracker.count).toBe(2); // combo toujours actif
+    });
+
+    it('un nouveau kill après expiration en vol relance le timer', () => {
+      tracker.onKill();
+      tracker.update(600, false); // timer expiré, en l'air
+      tracker.onKill(); // relance le timer
+      expect(tracker.count).toBe(2);
+      tracker.update(501, true); // timer expire à nouveau + au sol → reset
+      expect(tracker.count).toBe(0);
     });
 
     it('onGrounded ne reset pas si le timer n\'a pas expiré', () => {
       tracker.onKill();
-      tracker.update(100);
+      tracker.update(100, true);
       tracker.onGrounded();
-      expect(tracker.count).toBe(1); // combo maintenu
+      expect(tracker.count).toBe(1);
     });
   });
 
-  describe('mix flèche + stomp', () => {
-    it('un kill par flèche relance le timer pendant un combo aérien', () => {
-      grounded = false;
-      tracker.onKill(); // stomp
-      tracker.update(400);
-      tracker.onKill(); // flèche en l'air → relance timer
-      tracker.update(400);
-      expect(tracker.count).toBe(2); // timer pas encore expiré
+  describe('enchaînement kills (timer relance)', () => {
+    it('un kill relance le timer pendant un combo en vol', () => {
+      tracker.onKill();
+      tracker.update(400, false);
+      tracker.onKill();
+      tracker.update(400, false);
+      expect(tracker.count).toBe(2);
     });
   });
 
   describe('bestCombo', () => {
-    it('met à jour bestCombo au reset', () => {
+    it('met à jour bestCombo au reset explicite', () => {
       tracker.onKill();
       tracker.onKill();
       tracker.onKill();
@@ -103,6 +104,24 @@ describe('ComboTracker', () => {
       tracker.reset();
       expect(tracker.bestCombo).toBe(0);
     });
+
+    it('bestCombo mis à jour via auto-reset (timer expire + au sol)', () => {
+      tracker.onKill();
+      tracker.onKill();
+      tracker.update(501, true); // timer expire + grounded → auto-reset
+      expect(tracker.bestCombo).toBe(2);
+      expect(tracker.count).toBe(0);
+    });
+
+    it('bestCombo mis à jour via onGrounded après expiration timer', () => {
+      tracker.onKill();
+      tracker.onKill();
+      tracker.onKill();
+      tracker.update(501, false); // timer expire, en l'air
+      tracker.onGrounded(); // atterrit → reset
+      expect(tracker.bestCombo).toBe(3);
+      expect(tracker.count).toBe(0);
+    });
   });
 
   describe('reset', () => {
@@ -121,11 +140,36 @@ describe('ComboTracker', () => {
       expect(tracker.count).toBe(0);
       expect(tracker.bestCombo).toBe(3);
     });
+
+    it('reset pendant timer actif capture bestCombo et réinitialise le timer', () => {
+      tracker.onKill();
+      tracker.onKill();
+      tracker.onKill();
+      tracker.update(200, false); // timer actif à 300ms restant
+      tracker.reset(); // mort du joueur mid-combo
+      expect(tracker.bestCombo).toBe(3);
+      expect(tracker.count).toBe(0);
+      // vérifier que le timer est bien réinitialisé : un nouveau kill ne continue pas l'ancien combo
+      tracker.onKill();
+      expect(tracker.count).toBe(1);
+    });
+
+    it('onKill après reset démarre un nouveau combo propre', () => {
+      tracker.onKill();
+      tracker.onKill();
+      tracker.reset();
+      tracker.onKill();
+      expect(tracker.count).toBe(1);
+      // le timer est actif pour le nouveau combo
+      tracker.update(501, true);
+      expect(tracker.count).toBe(0);
+      expect(tracker.bestCombo).toBe(2);
+    });
   });
 
   describe('cas limites', () => {
     it('update sans aucun kill ne fait rien', () => {
-      tracker.update(1000);
+      tracker.update(1000, true);
       expect(tracker.count).toBe(0);
     });
 
@@ -135,23 +179,26 @@ describe('ComboTracker', () => {
     });
 
     it('kill exactement au moment de l\'expiration du timer (delta = 500)', () => {
-      grounded = false;
       tracker.onKill();
-      tracker.update(500); // timer arrive à 0 exactement
-      // timer expiré mais en l'air → pas de reset
+      tracker.update(500, false);
       expect(tracker.count).toBe(1);
-      tracker.onKill(); // relance le timer
+      tracker.onKill();
       expect(tracker.count).toBe(2);
     });
 
     it('multiple updates partielles totalisent le timeout', () => {
-      grounded = true;
       tracker.onKill();
-      tracker.update(200);
-      tracker.update(200);
-      expect(tracker.count).toBe(1); // 400ms, pas encore expiré
-      tracker.update(101); // 501ms total → expiré + au sol → reset
+      tracker.update(200, true);
+      tracker.update(200, true);
+      expect(tracker.count).toBe(1);
+      tracker.update(101, true);
       expect(tracker.count).toBe(0);
+    });
+
+    it('update(0) ne change rien', () => {
+      tracker.onKill();
+      tracker.update(0, true);
+      expect(tracker.count).toBe(1);
     });
   });
 });
